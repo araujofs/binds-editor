@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
 	binds    []string
 	cursor   int
 	selected map[int]struct{}
+	table table.Model
 }
 
 // View implements tea.Model.
