@@ -1,10 +1,18 @@
 package files
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestBindsReading(t *testing.T) {
-	_, err := readBindingsFile("/home/arthur/.config/hypr/bindings.conf")	
+	binds, err := readBindsFile("/home/arthur/.local/share/omarchy/default/hypr/bindings/tiling.conf")	
+
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	for _, bind := range binds {
+		fmt.Printf("%+v\n\n", bind)
 	}
 }

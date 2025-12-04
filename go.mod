@@ -1,4 +1,4 @@
-module github.com/araujofs/hyprland-keybindings-tui
+module github.com/araujofs/binds-editor
 
 go 1.25.4
 
