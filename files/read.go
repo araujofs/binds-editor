@@ -7,48 +7,34 @@ import (
 	"strings"
 )
 
+type ModKey string
+
 type Shortcut struct {
 	ModKeys []ModKey
-	Key []string
+	Key string
 }
 
 type Bind struct {
 	BindCore
 	LineNumber int
-	RawLine int
+	RawLine string
+	Flags []string
 }
 
 type BindCore struct {
 	Shortcut Shortcut
 	ActionType string
 	Action string
-	Description *string
+	Description string
 }
 
-type ModKey string
-
-const (
-	SHIFT ModKey = "SHIFT"
-	CAPS ModKey = "CAPS"	
-	CTRL ModKey = "CTRL"	
-	CONTROL ModKey = "CONTROL"	
-	ALT ModKey = "ALT"	
-	MOD2 ModKey = "MOD2"	
-	MOD3 ModKey = "MOD3"	
-	SUPER ModKey = "SUPER"	
-	WIN ModKey = "WIN"	
-	LOGO ModKey = "LOGO"	
-	MOD4 ModKey = "MOD4"	
-	MOD5 ModKey = "MOD5"	
-)
-
-func readBindsFile(path string) ([]Bind, error) {
+func readBindsFile(path string) ([]*Bind, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	bindings := make([]Bind, 0, 50)
+	bindings := make([]*Bind, 0, 50)
 
 	scanner := bufio.NewScanner(f)
 
@@ -57,62 +43,153 @@ func readBindsFile(path string) ([]Bind, error) {
 		lineNumber++
 
 		line := scanner.Text()
-		bindings = append(bindings, parseBind(line, lineNumber))
+		bind, err := parseBind(line, lineNumber)
+
+		if err == nil && bind != nil {
+			bindings = append(bindings, bind)	
+		}
 	}
 
-	return nil, nil
+	return bindings, nil
 }
 
 func parseBind(rawBindLine string, bindLineNumber int) (*Bind, error) {
-	if (rawBindLine[0] == '#') {
+	if (len(rawBindLine) == 0 || rawBindLine[0] == '#') {
 		return nil, nil
 	}
-	errorMsg := fmt.Errorf("Invalid bind format on line %d! Raw line: (%s)", bindLineNumber, rawBindLine)
+	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawBindLine)
 
-	bindType, bindContent, found := strings.Cut(rawBindLine, "=")
+	bindType, bindContent, found := strings.Cut(strings.TrimSpace(rawBindLine), "=")
 
 	if !found {
 		return nil, errorMsg
 	}
 
+	bindContent = strings.TrimSpace(bindContent)
 	bindType = strings.TrimSpace(bindType)
+	bindTypeLen := len(bindType)
 
-	if !(strings.Contains(bindType, "bind")) || !(len(bindType) <= 5) {
+	if !(strings.Contains(bindType, "bind")) {
 		return nil, errorMsg
 	}
 
-	if len(bindType) == 4 {
-		parseBindContent(bindContent)
+	bindFlags := ""
+
+	if bindTypeLen != 4 {
+		bindFlags = bindType[4:]
 	}
 
-	switch bindType[4] {
-	case 'd':
-		parseBindContentWithDescription(bindContent)
-	default:
-		return nil, errorMsg
+	if strings.Contains(bindFlags, "s") {
+		return nil, fmt.Errorf("for now binds with the 's' flag are not parsed! Line: %d, Raw line: %s", bindLineNumber, rawBindLine)
 	}
+
+	bind, err := parseBindContent(bindContent)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Bind{
+		BindCore: *bind,
+		LineNumber: bindLineNumber,
+		RawLine: rawBindLine,
+		Flags: strings.Split(bindFlags, ""),
+	}, nil
 }
 
 func parseBindContent(bindContent string) (*BindCore, error) {
 	parts := strings.Split(bindContent, ",")
+	partsLen := len(parts)
 
-	if len(parts) != 4 {
-		return nil, fmt.Errorf("invalid bind format!")
+	if partsLen > 5 || partsLen < 4 {
+		return nil, fmt.Errorf("invalid bind format")
+	}
+
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
 	}
 	
-	modKeys := strings.TrimSpace(parts[0])
-	keys := strings.TrimSpace(parts[1])
-	actionType := strings.TrimSpace(parts[2])
-	action := strings.TrimSpace(parts[3])
+	modKeys := parseModKeys(parts[0])
+	key := parts[1]
+	action := parts[3]
+	actionType := parts[2]
+	var description string
+	
+	if partsLen == 5 {
+		actionType = parts[3]
+		action = parts[4]
+		description = parts[2]
+	}
+
+	return &BindCore{
+		Shortcut: Shortcut{
+			ModKeys: modKeys,
+			Key: key,
+		},
+		ActionType: actionType,
+		Action: action,
+		Description: description,
+	}, nil
 
 	
 }
 
-func parseBindContentWithDescription(bindContent string) (*BindCore, error) {
-	parts := strings.Split(bindContent, ",")
-
-	if len(parts) != 5 {
-		return nil, fmt.Errorf("invalid bind format!")
+func parseModKeys(modKeys string) []ModKey {
+	if modKeys == "" {
+		return nil
 	}
 
+	s := strings.ToUpper(modKeys)
+	separatedModKeys := []ModKey{}
+
+	// it needs to be like that because hyprland doesnt define an especific separator
+	if strings.Contains(s, "SHIFT") { 
+		separatedModKeys = append(separatedModKeys, "SHIFT") 
+	}
+
+	if strings.Contains(s, "CAPS") { 
+		separatedModKeys = append(separatedModKeys, "CAPS") 
+	}
+
+	if strings.Contains(s, "CTRL") { 
+		separatedModKeys = append(separatedModKeys, "CTRL") 
+	}
+
+	if strings.Contains(s, "CONTROL") { 
+		separatedModKeys = append(separatedModKeys, "CONTROL") 
+	}
+
+	if strings.Contains(s, "ALT") { 
+		separatedModKeys = append(separatedModKeys, "ALT") 
+	}
+
+	if strings.Contains(s, "MOD2") { 
+		separatedModKeys = append(separatedModKeys, "MOD2") 
+	}
+
+	if strings.Contains(s, "MOD3") { 
+		separatedModKeys = append(separatedModKeys, "MOD3") 
+	}
+
+	if strings.Contains(s, "SUPER") { 
+		separatedModKeys = append(separatedModKeys, "SUPER") 
+	}
+
+	if strings.Contains(s, "WIN") { 
+		separatedModKeys = append(separatedModKeys, "WIN") 
+	}
+
+	if strings.Contains(s, "LOGO") { 
+		separatedModKeys = append(separatedModKeys, "LOGO") 
+	}
+
+	if strings.Contains(s, "MOD4") { 
+		separatedModKeys = append(separatedModKeys, "MOD4") 
+	}
+
+	if strings.Contains(s, "MOD5") { 
+		separatedModKeys = append(separatedModKeys, "MOD5") 
+	}
+
+	return separatedModKeys
 }
