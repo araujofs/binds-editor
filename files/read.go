@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-type ModKey string
+var variables = map[string]string{}
 
 type Shortcut struct {
-	ModKeys []ModKey
+	ModKeys []string
 	Key string
 }
 
@@ -28,7 +28,7 @@ type BindCore struct {
 	Description string
 }
 
-func readBindsFile(path string) ([]*Bind, error) {
+func ReadBindsFile(path string) ([]*Bind, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -53,13 +53,14 @@ func readBindsFile(path string) ([]*Bind, error) {
 	return bindings, nil
 }
 
-func parseBind(rawBindLine string, bindLineNumber int) (*Bind, error) {
-	if (len(rawBindLine) == 0 || rawBindLine[0] == '#') {
+func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
+	if (len(rawLine) == 0 || rawLine[0] == '#') {
 		return nil, nil
 	}
-	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawBindLine)
 
-	bindType, bindContent, found := strings.Cut(strings.TrimSpace(rawBindLine), "=")
+	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
+
+	bindType, bindContent, found := strings.Cut(strings.TrimSpace(rawLine), "=")
 
 	if !found {
 		return nil, errorMsg
@@ -80,7 +81,7 @@ func parseBind(rawBindLine string, bindLineNumber int) (*Bind, error) {
 	}
 
 	if strings.Contains(bindFlags, "s") {
-		return nil, fmt.Errorf("for now binds with the 's' flag are not parsed! Line: %d, Raw line: %s", bindLineNumber, rawBindLine)
+		return nil, fmt.Errorf("for now binds with the 's' flag are not parsed! Line: %d, Raw line: %s", bindLineNumber, rawLine)
 	}
 
 	bind, err := parseBindContent(bindContent)
@@ -92,7 +93,7 @@ func parseBind(rawBindLine string, bindLineNumber int) (*Bind, error) {
 	return &Bind{
 		BindCore: *bind,
 		LineNumber: bindLineNumber,
-		RawLine: rawBindLine,
+		RawLine: rawLine,
 		Flags: strings.Split(bindFlags, ""),
 	}, nil
 }
@@ -134,13 +135,13 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 	
 }
 
-func parseModKeys(modKeys string) []ModKey {
+func parseModKeys(modKeys string) []string {
 	if modKeys == "" {
 		return nil
 	}
 
 	s := strings.ToUpper(modKeys)
-	separatedModKeys := []ModKey{}
+	separatedModKeys := []string{}
 
 	// it needs to be like that because hyprland doesnt define an especific separator
 	if strings.Contains(s, "SHIFT") { 
@@ -192,4 +193,22 @@ func parseModKeys(modKeys string) []ModKey {
 	}
 
 	return separatedModKeys
+}
+
+func (b Bind) KeybindToRow() []string {
+	var shortcut = ""
+
+	if joinedModKeys := strings.Join(b.Shortcut.ModKeys, "+"); joinedModKeys != "" {
+		shortcut = strings.Join([]string{joinedModKeys, b.Shortcut.Key}, "+")
+	} else {
+		shortcut = b.Shortcut.Key
+	}
+
+	return []string{
+		shortcut,
+		b.ActionType,
+		b.Action,
+		b.Description,
+		strings.Join(b.Flags, ", "),
+	}	
 }
