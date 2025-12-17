@@ -5,73 +5,23 @@ import (
 	"os"
 
 	"github.com/araujofs/binds-editor/files"
+	myKeys "github.com/araujofs/binds-editor/help"
 
 	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 )
 
-type keyMap struct {
-	Up key.Binding
-	Down key.Binding
-	Create key.Binding
-	Delete key.Binding
-	Edit key.Binding
-	Unbind key.Binding
-	Close key.Binding
-}
-
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Create, k.Delete, k.Edit, k.Unbind, k.Close}
-}
-
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Create, k.Delete, k.Edit, k.Unbind, k.Close}}
-}
-
-var keys = keyMap{
-	Up: key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "move up"),
-	),
-	Down: key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "move down"),
-	),
-	Create: key.NewBinding(
-		key.WithKeys("c"),
-		key.WithHelp("c", "create bind"),
-	),
-	Delete: key.NewBinding(
-		key.WithKeys("d"),
-		key.WithHelp("d", "delete bind"),
-	),
-	Edit: key.NewBinding(
-		key.WithKeys("e"),
-		key.WithHelp("e", "edit bind"),
-	),
-	Unbind: key.NewBinding(
-		key.WithKeys("u"),
-		key.WithHelp("j", "unbind"),
-	),
-	Close: key.NewBinding(
-		key.WithKeys("u", "ctrl+c"),
-		key.WithHelp("ctrl+c/q", "quit"),
-	),
-}
-
 type model struct {
 	binds    []*files.Bind
 	cursor   int
 	table table.Model
 	help help.Model
-	keys keyMap
+	keys myKeys.KeyMap
 	width int
 }
-
 
 func initialModel() model {
 	terminalWidth, _, err := term.GetSize(0)
@@ -84,7 +34,7 @@ func initialModel() model {
 		binds:    []*files.Bind{},
 		cursor: 0,
 		help: help.New(),
-		keys: keys,
+		keys: myKeys.Keys,
 		width: terminalWidth,
 	}
 }
@@ -120,8 +70,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var baseStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#8f5aff")).Align(lipgloss.Center).Width(m.width)
-	var tableStyle = lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).
+	baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8f5aff")).Align(lipgloss.Center).Width(m.width)
+	tableStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#fafffa")).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).
 		BorderBottom(true).
 		Bold(false).Align(lipgloss.Center)
 
