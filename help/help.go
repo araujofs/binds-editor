@@ -5,13 +5,13 @@ import (
 )
 
 type KeyMap struct {
-	Up key.Binding
-	Down key.Binding
+	Up     key.Binding
+	Down   key.Binding
 	Create key.Binding
 	Delete key.Binding
-	Edit key.Binding
+	Edit   key.Binding
 	Unbind key.Binding
-	Close key.Binding
+	Close  key.Binding
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {

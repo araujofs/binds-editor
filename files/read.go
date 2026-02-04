@@ -11,20 +11,20 @@ var variables = map[string]string{}
 
 type Shortcut struct {
 	ModKeys []string
-	Key string
+	Key     string
 }
 
 type Bind struct {
 	BindCore
 	LineNumber int
-	RawLine string
-	Flags []string
+	RawLine    string
+	Flags      []string
 }
 
 type BindCore struct {
-	Shortcut Shortcut
-	ActionType string
-	Action string
+	Shortcut    Shortcut
+	ActionType  string
+	Action      string
 	Description string
 }
 
@@ -46,7 +46,7 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 		bind, err := parseBind(line, lineNumber)
 
 		if err == nil && bind != nil {
-			bindings = append(bindings, bind)	
+			bindings = append(bindings, bind)
 		}
 	}
 
@@ -54,7 +54,7 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 }
 
 func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
-	if (len(rawLine) == 0 || rawLine[0] == '#') {
+	if len(rawLine) == 0 || rawLine[0] == '#' {
 		return nil, nil
 	}
 
@@ -91,10 +91,10 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 	}
 
 	return &Bind{
-		BindCore: *bind,
+		BindCore:   *bind,
 		LineNumber: bindLineNumber,
-		RawLine: rawLine,
-		Flags: strings.Split(bindFlags, ""),
+		RawLine:    rawLine,
+		Flags:      strings.Split(bindFlags, ""),
 	}, nil
 }
 
@@ -109,13 +109,13 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 	for i, p := range parts {
 		parts[i] = strings.TrimSpace(p)
 	}
-	
+
 	modKeys := parseModKeys(parts[0])
 	key := parts[1]
 	action := parts[3]
 	actionType := parts[2]
 	var description string
-	
+
 	if partsLen == 5 {
 		actionType = parts[3]
 		action = parts[4]
@@ -125,14 +125,13 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 	return &BindCore{
 		Shortcut: Shortcut{
 			ModKeys: modKeys,
-			Key: key,
+			Key:     key,
 		},
-		ActionType: actionType,
-		Action: action,
+		ActionType:  actionType,
+		Action:      action,
 		Description: description,
 	}, nil
 
-	
 }
 
 func parseModKeys(modKeys string) []string {
@@ -144,52 +143,52 @@ func parseModKeys(modKeys string) []string {
 	separatedModKeys := []string{}
 
 	// it needs to be like that because hyprland doesnt define an especific separator
-	if strings.Contains(s, "SHIFT") { 
-		separatedModKeys = append(separatedModKeys, "SHIFT") 
+	if strings.Contains(s, "SHIFT") {
+		separatedModKeys = append(separatedModKeys, "SHIFT")
 	}
 
-	if strings.Contains(s, "CAPS") { 
-		separatedModKeys = append(separatedModKeys, "CAPS") 
+	if strings.Contains(s, "CAPS") {
+		separatedModKeys = append(separatedModKeys, "CAPS")
 	}
 
-	if strings.Contains(s, "CTRL") { 
-		separatedModKeys = append(separatedModKeys, "CTRL") 
+	if strings.Contains(s, "CTRL") {
+		separatedModKeys = append(separatedModKeys, "CTRL")
 	}
 
-	if strings.Contains(s, "CONTROL") { 
-		separatedModKeys = append(separatedModKeys, "CONTROL") 
+	if strings.Contains(s, "CONTROL") {
+		separatedModKeys = append(separatedModKeys, "CONTROL")
 	}
 
-	if strings.Contains(s, "ALT") { 
-		separatedModKeys = append(separatedModKeys, "ALT") 
+	if strings.Contains(s, "ALT") {
+		separatedModKeys = append(separatedModKeys, "ALT")
 	}
 
-	if strings.Contains(s, "MOD2") { 
-		separatedModKeys = append(separatedModKeys, "MOD2") 
+	if strings.Contains(s, "MOD2") {
+		separatedModKeys = append(separatedModKeys, "MOD2")
 	}
 
-	if strings.Contains(s, "MOD3") { 
-		separatedModKeys = append(separatedModKeys, "MOD3") 
+	if strings.Contains(s, "MOD3") {
+		separatedModKeys = append(separatedModKeys, "MOD3")
 	}
 
-	if strings.Contains(s, "SUPER") { 
-		separatedModKeys = append(separatedModKeys, "SUPER") 
+	if strings.Contains(s, "SUPER") {
+		separatedModKeys = append(separatedModKeys, "SUPER")
 	}
 
-	if strings.Contains(s, "WIN") { 
-		separatedModKeys = append(separatedModKeys, "WIN") 
+	if strings.Contains(s, "WIN") {
+		separatedModKeys = append(separatedModKeys, "WIN")
 	}
 
-	if strings.Contains(s, "LOGO") { 
-		separatedModKeys = append(separatedModKeys, "LOGO") 
+	if strings.Contains(s, "LOGO") {
+		separatedModKeys = append(separatedModKeys, "LOGO")
 	}
 
-	if strings.Contains(s, "MOD4") { 
-		separatedModKeys = append(separatedModKeys, "MOD4") 
+	if strings.Contains(s, "MOD4") {
+		separatedModKeys = append(separatedModKeys, "MOD4")
 	}
 
-	if strings.Contains(s, "MOD5") { 
-		separatedModKeys = append(separatedModKeys, "MOD5") 
+	if strings.Contains(s, "MOD5") {
+		separatedModKeys = append(separatedModKeys, "MOD5")
 	}
 
 	return separatedModKeys
@@ -210,5 +209,5 @@ func (b Bind) KeybindToRow() []string {
 		b.Action,
 		b.Description,
 		strings.Join(b.Flags, ", "),
-	}	
+	}
 }

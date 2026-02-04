@@ -6,7 +6,7 @@ import (
 )
 
 func TestBindsReading(t *testing.T) {
-	binds, err := ReadBindsFile("../keybinds.test.conf")	
+	binds, err := ReadBindsFile("../keybinds.test.conf")
 
 	if err != nil {
 		t.Fatal(err)
@@ -15,7 +15,6 @@ func TestBindsReading(t *testing.T) {
 	for _, bind := range binds {
 		fmt.Printf("%+v\n\n", bind)
 	}
-
 
 	fmt.Printf("%+v\n", variables)
 }

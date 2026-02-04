@@ -15,12 +15,12 @@ import (
 )
 
 type model struct {
-	binds    []*files.Bind
-	cursor   int
-	table table.Model
-	help help.Model
-	keys myKeys.KeyMap
-	width int
+	binds  []*files.Bind
+	cursor int
+	table  table.Model
+	help   help.Model
+	keys   myKeys.KeyMap
+	width  int
 }
 
 func initialModel() model {
@@ -31,11 +31,11 @@ func initialModel() model {
 	}
 
 	return model{
-		binds:    []*files.Bind{},
+		binds:  []*files.Bind{},
 		cursor: 0,
-		help: help.New(),
-		keys: myKeys.Keys,
-		width: terminalWidth,
+		help:   help.New(),
+		keys:   myKeys.Keys,
+		width:  terminalWidth,
 	}
 }
 
@@ -75,7 +75,7 @@ func (m model) View() string {
 		BorderBottom(true).
 		Bold(false).Align(lipgloss.Center)
 
-	paddedWidth, spaces := m.width - 5, 16
+	paddedWidth, spaces := m.width-5, 16
 
 	columns := []table.Column{
 		{Title: "Shortcut", Width: (paddedWidth / spaces) * 2},
@@ -111,7 +111,7 @@ func main() {
 		return
 	}
 
-	for _, bind := range  binds {
+	for _, bind := range binds {
 		rows = append(rows, bind.KeybindToRow())
 	}
 
@@ -136,10 +136,7 @@ func main() {
 		Bold(false)
 	t.SetStyles(s)
 
-
-
 	m.table = t
-
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Printf("there's been an error: %v", err)
