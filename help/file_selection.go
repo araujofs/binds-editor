@@ -6,14 +6,22 @@ import (
 
 type FileSelectionKeyMap struct {
 	CommonKeyMap
-	Find, Save key.Binding
+	Add, Edit, Delete, Save key.Binding
 }
 
 var FileSelectionKeys = FileSelectionKeyMap{
 	CommonKeys,
 	key.NewBinding(
-		key.WithKeys("f"),
-		key.WithHelp("f", "find binding file"),
+		key.WithKeys("a"),
+		key.WithHelp("a", "add file"),
+	),
+	key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "edit file"),
+	),
+	key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "delete file"),
 	),
 	key.NewBinding(
 		key.WithKeys("s"),
@@ -22,11 +30,11 @@ var FileSelectionKeys = FileSelectionKeyMap{
 }
 
 func (k FileSelectionKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Find, k.Close, k.Save}
+	return []key.Binding{k.Up, k.Down, k.Add, k.Edit, k.Delete, k.Save, k.Close, k.Help}
 }
 
 func (k FileSelectionKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Find, k.Close}}
+	return [][]key.Binding{{k.Up, k.Down, k.Add}, {k.Edit, k.Delete, k.Save}, {k.Close, k.Help}}
 }
 
 type FileSelectionInputKeyMap struct {

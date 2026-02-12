@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
@@ -12,12 +13,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type mode int
+
+const (
+	navigating mode = iota + 1
+	adding
+	editing
+)
+
 type FileSelection struct {
-	config      *config.Configuration
-	list        list.Model
-	input       textinput.Model
-	newFilePath string
-	message     string
+	config           *config.Configuration
+	list             list.Model
+	input            textinput.Model
+	mode             mode
+	selectedFilePath string
+	selectedFileName string
+	message          string
 }
 
 func InitFileSelection(path *string) *FileSelection {
@@ -27,7 +38,8 @@ func InitFileSelection(path *string) *FileSelection {
 
 	fileList := list.New(items, list.NewDefaultDelegate(), 8, 8)
 	fileList.SetShowTitle(false)
-	fileList.AdditionalShortHelpKeys = keys.FileSelectionKeys.ShortHelp
+	fileList.AdditionalFullHelpKeys = keys.FileSelectionKeys.ShortHelp
+	fileList.Help.ShowAll = true
 
 	input := textinput.New()
 	input.Placeholder = "General config"
@@ -35,17 +47,19 @@ func InitFileSelection(path *string) *FileSelection {
 	input.Width = 20
 
 	model := &FileSelection{
-		config:      config,
-		list:        fileList,
-		input:       input,
-		newFilePath: "",
-		message:     "",
+		config:           config,
+		list:             fileList,
+		input:            input,
+		mode:             navigating,
+		selectedFilePath: "",
+		selectedFileName: "",
+		message:          "",
 	}
 
 	if path != nil {
-		model.newFilePath = *path
+		model.selectedFilePath = *path
 		model.input.Focus()
-		model.list.AdditionalShortHelpKeys = keys.FileSelectionInputKeys.ShortHelp
+		model.mode = adding
 	}
 
 	if consts.WindowSize.Height != 0 {
@@ -67,18 +81,12 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		consts.WindowSize = msg
 		m.setListSize()
 	case tea.KeyMsg:
-		if key.Matches(msg, keys.CoreKeys.Close) {
+		if msg.String() == "ctrl+c" {
 			m.config.SaveConfiguration()
 			return m, tea.Quit
 		}
-		if key.Matches(msg, keys.FileSelectionKeys.Save) {
-			err := m.config.SaveConfiguration()
 
-			if err != nil {
-				m.message = err.Error()
-			}
-		}
-		if m.input.Focused() {
+		if m.input.Focused() && m.mode != navigating {
 			switch {
 			case key.Matches(msg, keys.FileSelectionInputKeys.Enter):
 				configFileName := m.input.Value()
@@ -86,13 +94,29 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Blur()
 				m.setListSize()
 
-				err := m.config.AddFile(m.newFilePath, configFileName)
+				if strings.Trim(configFileName, " ") == "" {
+					m.selectedFileName = ""
+					m.selectedFilePath = ""
+					m.mode = navigating
+					return m, cmd
+				}
+
+				var err error
+				if m.mode == adding {
+					err = m.config.AddFile(m.selectedFilePath, configFileName)
+				}
+
+				if m.mode == editing {
+					err = m.config.EditFile(m.selectedFileName, configFileName)
+				}
 
 				if err != nil {
 					m.message = err.Error()
 				}
 
-				m.newFilePath = ""
+				m.selectedFileName = ""
+				m.selectedFilePath = ""
+				m.mode = navigating
 				m.list.SetItems(filesToItems(m.config.Files))
 			case key.Matches(msg, keys.FileSelectionInputKeys.Back):
 				m.input.SetValue("")
@@ -101,15 +125,63 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.input, cmd = m.input.Update(msg)
 		} else {
+			if key.Matches(msg, keys.CoreKeys.Close) {
+				m.config.SaveConfiguration()
+				return m, tea.Quit
+			}
+
 			switch {
-			case key.Matches(msg, keys.FileSelectionKeys.Find):
+			case key.Matches(msg, keys.FileSelectionKeys.Save):
+				err := m.config.SaveConfiguration()
+
+				if err != nil {
+					m.message = err.Error()
+				}
+
+			case key.Matches(msg, keys.FileSelectionKeys.Add):
 				return InitFileSearch()
+
+			case key.Matches(msg, keys.FileSelectionKeys.Delete):
+				selectedItem := m.list.SelectedItem()
+				if selectedItem == nil {
+					return m, cmd
+				}
+
+				err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
+				if err != nil {
+					m.message = err.Error()
+				}
+
+				m.list.SetItems(filesToItems(m.config.Files))
+
+			case key.Matches(msg, keys.FileSelectionKeys.Edit):
+				selectedItem := m.list.SelectedItem()
+				if selectedItem == nil {
+					return m, cmd
+				}
+
+				selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
+				if selectedFileIdx == -1 {
+					return m, cmd
+				}
+
+				selectedFile := m.config.Files[selectedFileIdx]
+				if selectedFile == nil {
+					return m, cmd
+				}
+
+				m.input.Focus()
+				m.input.SetValue(selectedFile.Name)
+				m.selectedFileName = selectedFile.Name
+				m.mode = editing
+
+				return m, cmd
+			case key.Matches(msg, keys.FileSelectionKeys.Help):
+				return m, cmd
 			}
 
 			m.list, cmd = m.list.Update(msg)
-
 		}
-
 	}
 
 	return m, cmd
