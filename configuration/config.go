@@ -31,10 +31,10 @@ type Configuration struct {
 	Files []*File `json:"files"`
 }
 
-// searchSlice tries to find a *File inside a []*File slice
+// SearchSlice tries to find a *File inside a []*File slice
 // based on the fieldName and fieldValue.
 // Returns the index if it exists or -1 if it doesn't.
-func searchSlice(s []*File, fieldName string, fieldValue string) int {
+func SearchSlice(s []*File, fieldName string, fieldValue string) int {
 	for idx, file := range s {
 		if (fieldName == "Name" && file.Name == fieldValue) || (fieldName == "Path" && file.Path == fieldValue) {
 			return idx
@@ -46,13 +46,13 @@ func searchSlice(s []*File, fieldName string, fieldValue string) int {
 
 func (c *Configuration) fileExists(path *string, name *string) (int, int) {
 	if name != nil {
-		if nameExists := searchSlice(c.Files, "Name", *name); nameExists != -1 {
+		if nameExists := SearchSlice(c.Files, "Name", *name); nameExists != -1 {
 			return nameExists, 1
 		}
 	}
 
 	if path != nil {
-		if pathExists := searchSlice(c.Files, "Path", *path); pathExists != -1 {
+		if pathExists := SearchSlice(c.Files, "Path", *path); pathExists != -1 {
 			return pathExists, 2
 		}
 	}
@@ -88,14 +88,14 @@ func (c *Configuration) RemoveFile(name string) error {
 	return nil
 }
 
-func (c *Configuration) EditFile(oldName string, newName string, newPath string) error {
+func (c *Configuration) EditFile(oldName string, newName string) error {
 	idx, exists := c.fileExists(nil, &oldName)
 
 	if exists == -1 {
 		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldName)
 	}
 
-	c.Files[idx] = &File{Name: newName, Path: newPath}
+	c.Files[idx].Name = newName
 
 	return nil
 }
