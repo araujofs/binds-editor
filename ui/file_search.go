@@ -15,7 +15,6 @@ import (
 
 type FileSearch struct {
 	filePicker     filepicker.Model
-	filePicked     string
 	help           help.Model
 	message        string
 	emptyDirectory bool
@@ -33,7 +32,6 @@ func InitFileSearch() (*FileSearch, tea.Cmd) {
 
 	m := FileSearch{
 		filePicker:     fp,
-		filePicked:     "",
 		help:           help.New(),
 		message:        "",
 		emptyDirectory: false,
@@ -62,6 +60,16 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.CoreKeys.Close):
 			return m, tea.Quit
+		case key.Matches(msg, keys.FilePickerKeys.Select):
+			m.filePicker, cmd = m.filePicker.Update(msg)
+
+			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
+				selection := InitFileSelection(&path)
+
+				return selection, cmd
+			}
+
+			return m, cmd
 		case key.Matches(msg, keys.FilePickerKeys.Open):
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
@@ -79,10 +87,6 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.filePicker, cmd = m.filePicker.Update(msg)
-
-	if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
-		m.filePicked = path
-	}
 
 	return m, cmd
 

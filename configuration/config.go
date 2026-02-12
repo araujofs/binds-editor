@@ -63,11 +63,11 @@ func (c *Configuration) fileExists(path *string, name *string) (int, int) {
 func (c *Configuration) AddFile(path string, name string) error {
 	_, exists := c.fileExists(&path, &name)
 
-	if exists != 1 {
+	if exists == 1 {
 		return fmt.Errorf(`bindings file already exists with name "%s"`, name)
 	}
 
-	if exists != 2 {
+	if exists == 2 {
 		return fmt.Errorf(`bindings file already exists with path "%s"`, path)
 	}
 

@@ -25,7 +25,7 @@ var FilePickerKeys = FilePickerKeyMap{
 	// PageUp:       key.NewBinding(key.WithKeys("K", "pgup"), key.WithHelp("K/pgup", "page up")),
 	// PageDown:     key.NewBinding(key.WithKeys("J", "pgdown"), key.WithHelp("J/pgdown", "page down")),
 	Back:   key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("←/h", "back")),
-	Open:   key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→/l", "open")),
+	Open:   key.NewBinding(key.WithKeys("l", "right", "enter"), key.WithHelp("→/l", "open")),
 	Select: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
 }
 
