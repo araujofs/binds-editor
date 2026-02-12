@@ -1,10 +1,11 @@
-package models
+package ui
 
 import (
 	"fmt"
 
+	consts "github.com/araujofs/binds-editor/constants"
 	"github.com/araujofs/binds-editor/files"
-	myKeys "github.com/araujofs/binds-editor/help"
+	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -12,7 +13,14 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
+)
+
+var (
+	paddingStyle = lipgloss.NewStyle().Padding(0, consts.DefaultPadding)
+	tableStyle   = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderBottomForeground(lipgloss.Color("240"))
 )
 
 type Table struct {
@@ -20,17 +28,10 @@ type Table struct {
 	cursor int
 	table  table.Model
 	help   help.Model
-	keys   myKeys.KeyMap
-	width  int
+	keys   keys.TableKeyMap
 }
 
 func InitTable() (*Table, tea.Msg) {
-	terminalWidth, _, err := term.GetSize(0)
-
-	if err != nil {
-		terminalWidth = 160
-	}
-
 	binds, err := files.ReadBindsFile("/home/arthur/.config/hypr/bindings.conf")
 
 	if err != nil {
@@ -40,9 +41,8 @@ func InitTable() (*Table, tea.Msg) {
 
 	columns := []table.Column{
 		{Title: "Shortcut", Width: 20},
-		{Title: "Type", Width: 20},
-		{Title: "Action", Width: 20},
 		{Title: "Description", Width: 20},
+		{Title: "Type", Width: 20},
 		{Title: "Flags", Width: 20},
 	}
 
@@ -56,7 +56,8 @@ func InitTable() (*Table, tea.Msg) {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(12),
+		table.WithHeight(getTableHeight(len(rows))),
+		table.WithKeyMap(table.DefaultKeyMap()),
 	)
 
 	s := table.DefaultStyles()
@@ -77,12 +78,11 @@ func InitTable() (*Table, tea.Msg) {
 	t.SetStyles(s)
 
 	return &Table{
-		binds:  []*files.Bind{},
+		binds:  binds,
 		cursor: 0,
 		table:  t,
 		help:   help.New(),
-		keys:   myKeys.Keys,
-		width:  terminalWidth,
+		keys:   keys.TableKeys,
 	}, nil
 }
 
@@ -94,6 +94,9 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		consts.WindowSize = msg
+		m.table.SetHeight(getTableHeight(len(m.table.Rows())))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Close):
@@ -107,33 +110,33 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		}
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.table, cmd = m.table.Update(msg)
 	}
-
-	m.table, cmd = m.table.Update(msg)
 
 	return m, cmd
 }
 
 func (m Table) View() string {
-	baseStyle := lipgloss.NewStyle().Align(lipgloss.Center).Width(m.width)
-	tableStyle := lipgloss.NewStyle().
-		BorderBottom(true).
-		Bold(false).Align(lipgloss.Center)
 
-	paddedWidth, spaces := m.width-5, 16
+	width := consts.WindowSize.Width - consts.DefaultPadding
 
 	columns := []table.Column{
-		{Title: "Shortcut", Width: (paddedWidth / spaces) * 2},
-		{Title: "Type", Width: (paddedWidth / spaces) * 1},
-		{Title: "Action", Width: (paddedWidth / spaces) * 10},
-		{Title: "Description", Width: (paddedWidth / spaces) * 2},
-		{Title: "Flags", Width: (paddedWidth / spaces) * 1},
+		{Title: "Shortcut", Width: width / 4},
+		{Title: "Description", Width: width / 4},
+		{Title: "Type", Width: width / 4},
+		{Title: "Flags", Width: width / 4},
 	}
 
 	m.table.SetColumns(columns)
 
 	helpView := "\n" + m.help.View(m.keys)
-	return baseStyle.Render("Binds Editor\n" + tableStyle.Render(m.table.View()) + helpView + "\n")
+	return paddingStyle.Render("Binds Editor | Binds: " + fmt.Sprint(len(m.binds)) + "\n" + tableStyle.Render(m.table.View()) + helpView + "\n")
+}
+
+func getTableHeight(rowsSize int) int {
+	var tableHeight int
+
+	tableHeight = min(consts.WindowSize.Height-consts.DefaultPadding-1, rowsSize)
+
+	return tableHeight
 }

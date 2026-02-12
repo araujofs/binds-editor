@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/araujofs/binds-editor/models"
-
+	"github.com/araujofs/binds-editor/ui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
-	m, _ := models.InitTable()
+	m := ui.InitFileSelection()
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Printf("there's been an error: %v", err)

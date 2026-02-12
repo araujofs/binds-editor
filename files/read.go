@@ -205,9 +205,8 @@ func (b Bind) KeybindToRow() []string {
 
 	return []string{
 		shortcut,
-		b.ActionType,
-		b.Action,
 		b.Description,
+		b.ActionType,
 		strings.Join(b.Flags, ", "),
 	}
 }
