@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/araujofs/binds-editor/configuration"
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -25,21 +27,25 @@ type FileSelection struct {
 	config           *config.Configuration
 	list             list.Model
 	input            textinput.Model
+	help             help.Model
 	mode             mode
 	selectedFilePath string
 	selectedFileName string
 	message          string
 }
 
-func InitFileSelection(path *string) *FileSelection {
-	config := config.GetConfigData()
+func InitFileSelection(path *string, configuration *configuration.Configuration) *FileSelection {
+	if configuration == nil {
+		configuration = config.GetConfigData()
+	}
 
-	items := filesToItems(config.Files)
+	items := filesToItems(configuration.Files)
 
 	fileList := list.New(items, list.NewDefaultDelegate(), 8, 8)
 	fileList.SetShowTitle(false)
-	fileList.AdditionalFullHelpKeys = keys.FileSelectionKeys.ShortHelp
-	fileList.Help.ShowAll = true
+	fileList.SetShowHelp(false)
+	fileList.SetShowFilter(false)
+	fileList.SetFilteringEnabled(false)
 
 	input := textinput.New()
 	input.Placeholder = "General config"
@@ -47,9 +53,10 @@ func InitFileSelection(path *string) *FileSelection {
 	input.Width = 20
 
 	model := &FileSelection{
-		config:           config,
+		config:           configuration,
 		list:             fileList,
 		input:            input,
+		help:             help.New(),
 		mode:             navigating,
 		selectedFilePath: "",
 		selectedFileName: "",
@@ -60,6 +67,7 @@ func InitFileSelection(path *string) *FileSelection {
 		model.selectedFilePath = *path
 		model.input.Focus()
 		model.mode = adding
+		model.setListSize()
 	}
 
 	if consts.WindowSize.Height != 0 {
@@ -125,12 +133,15 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.input, cmd = m.input.Update(msg)
 		} else {
-			if key.Matches(msg, keys.CoreKeys.Close) {
-				m.config.SaveConfiguration()
-				return m, tea.Quit
-			}
 
 			switch {
+			case key.Matches(msg, keys.CoreKeys.Close):
+				m.config.SaveConfiguration()
+				return m, tea.Quit
+
+			case msg.String() == "esc":
+				return m, cmd
+
 			case key.Matches(msg, keys.FileSelectionKeys.Save):
 				err := m.config.SaveConfiguration()
 
@@ -139,7 +150,7 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case key.Matches(msg, keys.FileSelectionKeys.Add):
-				return InitFileSearch()
+				return InitFileSearch(m.config)
 
 			case key.Matches(msg, keys.FileSelectionKeys.Delete):
 				selectedItem := m.list.SelectedItem()
@@ -174,6 +185,7 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue(selectedFile.Name)
 				m.selectedFileName = selectedFile.Name
 				m.mode = editing
+				m.setListSize()
 
 				return m, cmd
 			case key.Matches(msg, keys.FileSelectionKeys.Help):
@@ -188,13 +200,13 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSelection) View() string {
-	title := fmt.Sprintf("Binds Editor | File Selection%s\n", m.message)
+	title := fmt.Sprintf("Binds Editor | File Selection%s\n\n", m.message)
 
 	if m.input.Focused() {
-		return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.input.View())
+		return consts.FullScreenStyle.Render(title + m.list.View() + "\n" + m.help.FullHelpView(keys.FilePickerKeys.FullHelp()) + "\n" + m.input.View())
 	}
 
-	return consts.FullScreenStyle.Render(title + m.list.View())
+	return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.help.FullHelpView(keys.FilePickerKeys.FullHelp()))
 }
 
 func filesToItems(files []*config.File) []list.Item {
@@ -216,9 +228,9 @@ func (m *FileSelection) setListSize() {
 	msg := consts.WindowSize
 
 	if m.input.Focused() {
-		m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-3)
+		m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-6)
 		return
 	}
 
-	m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-1)
+	m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-6)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -16,11 +17,12 @@ import (
 type FileSearch struct {
 	filePicker     filepicker.Model
 	help           help.Model
+	config         *configuration.Configuration
 	message        string
 	emptyDirectory bool
 }
 
-func InitFileSearch() (*FileSearch, tea.Cmd) {
+func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, tea.Cmd) {
 	fp := filepicker.New()
 
 	fp.AllowedTypes = []string{".conf"}
@@ -29,10 +31,13 @@ func InitFileSearch() (*FileSearch, tea.Cmd) {
 	fp.KeyMap = keys.GetFilepickerKeyMap()
 	fp.ShowSize = true
 	fp.Styles.EmptyDirectory = fp.Styles.EmptyDirectory.PaddingLeft(0)
+	h := help.New()
+	h.ShowAll = true
 
 	m := FileSearch{
 		filePicker:     fp,
-		help:           help.New(),
+		help:           h,
+		config:         configuration,
 		message:        "",
 		emptyDirectory: false,
 	}
@@ -60,16 +65,18 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.CoreKeys.Close):
 			return m, tea.Quit
+
 		case key.Matches(msg, keys.FilePickerKeys.Select):
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
 			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
-				selection := InitFileSelection(&path)
+				selection := InitFileSelection(&path, m.config)
 
 				return selection, cmd
 			}
 
 			return m, cmd
+
 		case key.Matches(msg, keys.FilePickerKeys.Open):
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
@@ -78,11 +85,17 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return m, cmd
+
 		case key.Matches(msg, keys.FilePickerKeys.Back):
 			m.emptyDirectory = false
+
+		case key.Matches(msg, keys.FilePickerKeys.GoBack):
+			selection := InitFileSelection(nil, m.config)
+
+			return selection, cmd
+
 		case key.Matches(msg, keys.CoreKeys.Help):
-			m.help.ShowAll = !m.help.ShowAll
-			setFilePickerHeight(&m)
+			return m, cmd
 		}
 	}
 
