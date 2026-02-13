@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/araujofs/binds-editor/configuration"
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
@@ -34,7 +33,7 @@ type FileSelection struct {
 	message          string
 }
 
-func InitFileSelection(path *string, configuration *configuration.Configuration) *FileSelection {
+func InitFileSelection(path *string, configuration *config.Configuration) *FileSelection {
 	if configuration == nil {
 		configuration = config.GetConfigData()
 	}
@@ -144,7 +143,6 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case key.Matches(msg, keys.FileSelectionKeys.Save):
 				err := m.config.SaveConfiguration()
-
 				if err != nil {
 					m.message = err.Error()
 				}
