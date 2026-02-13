@@ -30,11 +30,11 @@ var FileSelectionKeys = FileSelectionKeyMap{
 }
 
 func (k FileSelectionKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Add, k.Edit, k.Delete, k.Save, k.Close, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Add, k.Edit, k.Delete, k.Save, k.Close}
 }
 
 func (k FileSelectionKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Add}, {k.Edit, k.Delete, k.Save}, {k.Close, k.Help}}
+	return [][]key.Binding{{k.Up, k.Down, k.Save}, {k.Edit, k.Delete, k.Add}, {k.Close}}
 }
 
 type FileSelectionInputKeyMap struct {

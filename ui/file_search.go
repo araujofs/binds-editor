@@ -32,7 +32,6 @@ func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, te
 	fp.ShowSize = true
 	fp.Styles.EmptyDirectory = fp.Styles.EmptyDirectory.PaddingLeft(0)
 	h := help.New()
-	h.ShowAll = true
 
 	m := FileSearch{
 		filePicker:     fp,
@@ -106,26 +105,21 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSearch) View() string {
-	title := fmt.Sprintf("Binds Editor | File Searching%s\n", m.message)
+	title := fmt.Sprintf("Binds Editor | File Searching%s\n\n", m.message)
 
 	if m.emptyDirectory {
-		return consts.FullScreenFileSearchStyle.Render(title + m.filePicker.View() + lipgloss.NewStyle().MarginTop(1).Render(m.help.View(keys.FilePickerKeys)))
+		return consts.FullScreenFileSearchStyle.Render(title + m.filePicker.View() + lipgloss.NewStyle().MarginTop(1).Render(m.help.FullHelpView(keys.FilePickerKeys.FullHelp())))
 	}
 
-	return consts.FullScreenFileSearchStyle.Render((title + m.filePicker.View() + m.help.View(keys.FilePickerKeys)))
+	return consts.FullScreenFileSearchStyle.Render((title + m.filePicker.View() + m.help.FullHelpView(keys.FilePickerKeys.FullHelp())))
 }
 
 func setFilePickerHeight(model *FileSearch) {
 	top, _, bottom, _ := consts.FullScreenStyle.GetMargin()
 	windowHeight := consts.WindowSize.Height
 
-	if !model.help.ShowAll {
-		model.filePicker.SetHeight(windowHeight - top - bottom - 2)
-		return
-	}
-
 	helpHeight := len(keys.FilePickerKeys.FullHelp()[0])
-	model.filePicker.SetHeight(windowHeight - top - bottom - 1 - helpHeight)
+	model.filePicker.SetHeight(windowHeight - top - bottom - 2 - helpHeight)
 }
 
 func isDirEmpty(path string) bool {

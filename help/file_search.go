@@ -7,7 +7,7 @@ import (
 
 type FilePickerKeyMap struct {
 	CommonKeyMap
-	GoBack, Open, Back, GoToTop, GoToLast /* PageUp, PageDown,  */, Select, Close key.Binding
+	GoBack, Open, Back, GoToTop, GoToLast /* PageUp, PageDown,  */, Select key.Binding
 }
 
 func (k FilePickerKeyMap) ShortHelp() []key.Binding {
@@ -15,7 +15,7 @@ func (k FilePickerKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k FilePickerKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Open}, {k.Back, k.GoBack, k.Select}, {k.GoToTop, k.GoToLast}}
+	return [][]key.Binding{{k.Up, k.Down, k.Open}, {k.Back, k.GoBack, k.Select}, {k.GoToTop, k.GoToLast, k.Close}}
 }
 
 var FilePickerKeys = FilePickerKeyMap{

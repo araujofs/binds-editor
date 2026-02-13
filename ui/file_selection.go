@@ -203,10 +203,10 @@ func (m FileSelection) View() string {
 	title := fmt.Sprintf("Binds Editor | File Selection%s\n\n", m.message)
 
 	if m.input.Focused() {
-		return consts.FullScreenStyle.Render(title + m.list.View() + "\n" + m.help.FullHelpView(keys.FilePickerKeys.FullHelp()) + "\n" + m.input.View())
+		return consts.FullScreenStyle.Render(title + m.list.View() + "\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()) + "\n" + m.input.View())
 	}
 
-	return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.help.FullHelpView(keys.FilePickerKeys.FullHelp()))
+	return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()))
 }
 
 func filesToItems(files []*config.File) []list.Item {
