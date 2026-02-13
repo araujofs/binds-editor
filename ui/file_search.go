@@ -42,7 +42,7 @@ func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, te
 	}
 
 	if consts.WindowSize.Height != 0 {
-		setFilePickerHeight(&m)
+		m.setFilePickerHeight()
 	}
 
 	return &m, fp.Init()
@@ -58,7 +58,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
-		setFilePickerHeight(&m)
+		m.setFilePickerHeight()
 		return m, nil
 	case tea.KeyMsg:
 		switch {
@@ -71,7 +71,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
 				selection := InitFileSelection(&path, m.config)
 
-				return selection, cmd
+				return selection, nil
 			}
 
 			return m, cmd
@@ -91,10 +91,10 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.FilePickerKeys.GoBack):
 			selection := InitFileSelection(nil, m.config)
 
-			return selection, cmd
+			return selection, nil
 
 		case key.Matches(msg, keys.CoreKeys.Help):
-			return m, cmd
+			return m, nil
 		}
 	}
 
@@ -114,12 +114,12 @@ func (m FileSearch) View() string {
 	return consts.FullScreenFileSearchStyle.Render((title + m.filePicker.View() + m.help.FullHelpView(keys.FilePickerKeys.FullHelp())))
 }
 
-func setFilePickerHeight(model *FileSearch) {
+func (m *FileSearch) setFilePickerHeight() {
 	top, _, bottom, _ := consts.FullScreenStyle.GetMargin()
 	windowHeight := consts.WindowSize.Height
 
 	helpHeight := len(keys.FilePickerKeys.FullHelp()[0])
-	model.filePicker.SetHeight(windowHeight - top - bottom - 2 - helpHeight)
+	m.filePicker.SetHeight(windowHeight - top - bottom - 2 - helpHeight)
 }
 
 func isDirEmpty(path string) bool {

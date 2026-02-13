@@ -38,9 +38,7 @@ func InitFileSelection(path *string, configuration *config.Configuration) *FileS
 		configuration = config.GetConfigData()
 	}
 
-	items := filesToItems(configuration.Files)
-
-	fileList := list.New(items, list.NewDefaultDelegate(), 8, 8)
+	fileList := list.New([]list.Item{}, list.NewDefaultDelegate(), 8, 8)
 	fileList.SetShowTitle(false)
 	fileList.SetShowHelp(false)
 	fileList.SetShowFilter(false)
@@ -62,6 +60,9 @@ func InitFileSelection(path *string, configuration *config.Configuration) *FileS
 		message:          "",
 	}
 
+	items := model.filesToItems()
+	model.list.SetItems(items)
+
 	if path != nil {
 		model.selectedFilePath = *path
 		model.input.Focus()
@@ -81,8 +82,6 @@ func (m FileSelection) Init() tea.Cmd {
 }
 
 func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
@@ -94,107 +93,13 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.input.Focused() && m.mode != navigating {
-			switch {
-			case key.Matches(msg, keys.FileSelectionInputKeys.Enter):
-				configFileName := m.input.Value()
-				m.input.SetValue("")
-				m.input.Blur()
-				m.setListSize()
-
-				if strings.Trim(configFileName, " ") == "" {
-					m.selectedFileName = ""
-					m.selectedFilePath = ""
-					m.mode = navigating
-					return m, cmd
-				}
-
-				var err error
-				if m.mode == adding {
-					err = m.config.AddFile(m.selectedFilePath, configFileName)
-				}
-
-				if m.mode == editing {
-					err = m.config.EditFile(m.selectedFileName, configFileName)
-				}
-
-				if err != nil {
-					m.message = err.Error()
-				}
-
-				m.selectedFileName = ""
-				m.selectedFilePath = ""
-				m.mode = navigating
-				m.list.SetItems(filesToItems(m.config.Files))
-			case key.Matches(msg, keys.FileSelectionInputKeys.Back):
-				m.input.SetValue("")
-				m.input.Blur()
-			}
-
-			m.input, cmd = m.input.Update(msg)
-		} else {
-
-			switch {
-			case key.Matches(msg, keys.CoreKeys.Close):
-				m.config.SaveConfiguration()
-				return m, tea.Quit
-
-			case msg.String() == "esc":
-				return m, cmd
-
-			case key.Matches(msg, keys.FileSelectionKeys.Save):
-				err := m.config.SaveConfiguration()
-				if err != nil {
-					m.message = err.Error()
-				}
-
-			case key.Matches(msg, keys.FileSelectionKeys.Add):
-				return InitFileSearch(m.config)
-
-			case key.Matches(msg, keys.FileSelectionKeys.Delete):
-				selectedItem := m.list.SelectedItem()
-				if selectedItem == nil {
-					return m, cmd
-				}
-
-				err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
-				if err != nil {
-					m.message = err.Error()
-				}
-
-				m.list.SetItems(filesToItems(m.config.Files))
-
-			case key.Matches(msg, keys.FileSelectionKeys.Edit):
-				selectedItem := m.list.SelectedItem()
-				if selectedItem == nil {
-					return m, cmd
-				}
-
-				selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
-				if selectedFileIdx == -1 {
-					return m, cmd
-				}
-
-				selectedFile := m.config.Files[selectedFileIdx]
-				if selectedFile == nil {
-					return m, cmd
-				}
-
-				m.input.Focus()
-				m.input.SetValue(selectedFile.Name)
-				m.selectedFileName = selectedFile.Name
-				m.mode = editing
-				m.setListSize()
-
-				return m, cmd
-			case key.Matches(msg, keys.FileSelectionKeys.Help):
-				return m, cmd
-			}
-
-			m.list, cmd = m.list.Update(msg)
+			return updateInput(msg, &m)
 		}
+
+		return updateList(msg, &m)
 	}
 
-	return m, cmd
+	return m, nil
 }
 
 func (m FileSelection) View() string {
@@ -207,7 +112,9 @@ func (m FileSelection) View() string {
 	return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()))
 }
 
-func filesToItems(files []*config.File) []list.Item {
+func (m *FileSelection) filesToItems() []list.Item {
+	files := m.config.Files
+
 	if len(files) == 0 {
 		return make([]list.Item, 0)
 	}
@@ -231,4 +138,123 @@ func (m *FileSelection) setListSize() {
 	}
 
 	m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-6)
+}
+
+func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch {
+	case key.Matches(msg, keys.FileSelectionInputKeys.Enter):
+		configFileName := m.input.Value()
+		m.input.SetValue("")
+		m.input.Blur()
+		m.setListSize()
+
+		if strings.Trim(configFileName, " ") == "" {
+			m.mode = navigating
+		}
+
+		var err error
+		if m.mode == adding {
+			err = m.config.AddFile(m.selectedFilePath, configFileName)
+		}
+
+		if m.mode == editing {
+			err = m.config.EditFile(m.selectedFileName, configFileName)
+		}
+
+		if err != nil {
+			m.message = err.Error()
+		}
+
+		m.selectedFileName = ""
+		m.selectedFilePath = ""
+		m.mode = navigating
+		m.list.SetItems(m.filesToItems())
+
+		return m, nil
+
+	case key.Matches(msg, keys.FileSelectionInputKeys.Back):
+		m.input.SetValue("")
+		m.input.Blur()
+
+		m.selectedFileName = ""
+		m.selectedFilePath = ""
+
+		m.mode = navigating
+		return m, nil
+	}
+
+	m.input, cmd = m.input.Update(msg)
+
+	return m, cmd
+}
+
+func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch {
+	case key.Matches(msg, keys.CoreKeys.Close):
+		return m, tea.Quit
+
+	// the list interprets "esc" as Quit
+	case msg.String() == "esc":
+		return m, cmd
+
+	case key.Matches(msg, keys.FileSelectionKeys.Save):
+		err := m.config.SaveConfiguration()
+		if err != nil {
+			m.message = err.Error()
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.FileSelectionKeys.Add):
+		return InitFileSearch(m.config)
+
+	case key.Matches(msg, keys.FileSelectionKeys.Delete):
+		selectedItem := m.list.SelectedItem()
+		if selectedItem == nil {
+			return m, nil
+		}
+
+		err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
+		if err != nil {
+			m.message = err.Error()
+		}
+
+		m.list.SetItems(m.filesToItems())
+
+		return m, nil
+
+	case key.Matches(msg, keys.FileSelectionKeys.Edit):
+		selectedItem := m.list.SelectedItem()
+		if selectedItem == nil {
+			return m, nil
+		}
+
+		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
+		if selectedFileIdx == -1 {
+			return m, nil
+		}
+
+		selectedFile := m.config.Files[selectedFileIdx]
+		if selectedFile == nil {
+			return m, nil
+		}
+
+		m.input.Focus()
+		m.input.SetValue(selectedFile.Name)
+		m.selectedFileName = selectedFile.Name
+		m.mode = editing
+		m.setListSize()
+
+		return m, nil
+
+	case key.Matches(msg, keys.FileSelectionKeys.Help):
+		return m, nil
+	}
+
+	m.list, cmd = m.list.Update(msg)
+
+	return m, cmd
 }
