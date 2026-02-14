@@ -78,7 +78,7 @@ func InitFileSelection(path *string, configuration *config.Configuration) *FileS
 }
 
 func (m FileSelection) Init() tea.Cmd {
-	return nil
+	return tea.SetWindowTitle("Binds Editor")
 }
 
 func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

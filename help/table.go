@@ -6,7 +6,7 @@ import (
 
 type TableKeyMap struct {
 	CommonKeyMap
-	Create, Delete, Edit, Unbind, GoBack key.Binding
+	Create, Delete, Edit, Unbind, Comment, Details, GoBack key.Binding
 }
 
 func (k TableKeyMap) ShortHelp() []key.Binding {
@@ -14,7 +14,7 @@ func (k TableKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k TableKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Create}, {k.Delete, k.Edit, k.Unbind}, {k.Close, k.GoBack}}
+	return [][]key.Binding{{k.Up, k.Down, k.Create}, {k.Delete, k.Edit, k.Unbind}, {k.Comment, k.Details}, {k.Close, k.GoBack}}
 }
 
 var TableKeys = TableKeyMap{
@@ -34,6 +34,14 @@ var TableKeys = TableKeyMap{
 	key.NewBinding(
 		key.WithKeys("u"),
 		key.WithHelp("u", "unbind"),
+	),
+	key.NewBinding(
+		key.WithKeys("C"),
+		key.WithHelp("C", "toggle comment"),
+	),
+	key.NewBinding(
+		key.WithKeys("D"),
+		key.WithHelp("D", "bind details"),
 	),
 	key.NewBinding(
 		key.WithKeys("esc"),

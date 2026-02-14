@@ -27,7 +27,6 @@ type Table struct {
 	cursor int
 	table  table.Model
 	help   help.Model
-	keys   keys.TableKeyMap
 	config *config.Configuration
 	msgs.InfoModel
 }
@@ -41,8 +40,9 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 
 	columns := []table.Column{
 		{Title: "Shortcut", Width: 20},
-		{Title: "Description", Width: 20},
 		{Title: "Type", Width: 20},
+		{Title: "Description", Width: 20},
+		{Title: "Action Type", Width: 20},
 		{Title: "Flags", Width: 20},
 	}
 
@@ -74,6 +74,8 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 		Foreground(lipgloss.Color("#fff")).
 		Bold(true)
 
+	s.Cell = s.Cell.AlignHorizontal(lipgloss.Center)
+
 	t.SetStyles(s)
 
 	model := &Table{
@@ -81,7 +83,6 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 		cursor:    0,
 		table:     t,
 		help:      help.New(),
-		keys:      keys.TableKeys,
 		config:    configuration,
 		InfoModel: msgs.GetDefaultInfoModel(),
 	}
@@ -92,7 +93,7 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 }
 
 func (m Table) Init() tea.Cmd {
-	return tea.SetWindowTitle("Binds Editor")
+	return nil
 }
 
 func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -116,19 +117,42 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Error = nil
 
 		switch {
-		case key.Matches(msg, m.keys.Close):
+		case key.Matches(msg, keys.TableKeys.Close):
 			return m, tea.Quit
-		case key.Matches(msg, m.keys.Up):
+
+		case key.Matches(msg, keys.TableKeys.Up):
 			if m.cursor > 0 {
 				m.cursor--
 			}
-		case key.Matches(msg, m.keys.Down):
+
+		case key.Matches(msg, keys.TableKeys.Down):
 			if m.cursor < len(m.binds)-1 {
 				m.cursor++
 			}
-		case key.Matches(msg, m.keys.GoBack):
+
+		case key.Matches(msg, keys.TableKeys.Create):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.Edit):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.Delete):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.Unbind):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.Comment):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.Details):
+			return m, nil
+
+		case key.Matches(msg, keys.TableKeys.GoBack):
 			return InitFileSelection(nil, m.config), nil
+
 		}
+
 		m.table, cmd = m.table.Update(msg)
 	}
 
@@ -143,15 +167,16 @@ func (m Table) View() string {
 	width := consts.WindowSize.Width - consts.DefaultPadding
 
 	columns := []table.Column{
-		{Title: "Shortcut", Width: width / 4},
-		{Title: "Description", Width: width / 4},
-		{Title: "Type", Width: width / 4},
-		{Title: "Flags", Width: width / 4},
+		{Title: "Shortcut", Width: (width / 20) * 7},
+		{Title: "Type", Width: (width / 20) * 3},
+		{Title: "Description", Width: (width / 20) * 4},
+		{Title: "Action Type", Width: (width / 20) * 3},
+		{Title: "Flags", Width: (width / 20) * 3},
 	}
 
 	m.table.SetColumns(columns)
 
-	helpView := "\n" + m.help.FullHelpView(m.keys.FullHelp())
+	helpView := "\n" + m.help.FullHelpView(keys.TableKeys.FullHelp())
 	return paddingStyle.Render(title + m.table.View() + helpView)
 }
 

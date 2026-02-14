@@ -4,10 +4,17 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 )
 
-var variables = map[string]string{}
+type BindType int
+
+const (
+	normal BindType = iota + 1
+	unbind
+	comment
+)
 
 type Shortcut struct {
 	ModKeys []string
@@ -19,6 +26,7 @@ type Bind struct {
 	LineNumber int
 	RawLine    string
 	Flags      []string
+	Type       BindType
 }
 
 type BindCore struct {
@@ -58,60 +66,85 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 }
 
 func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
-	if len(rawLine) == 0 || rawLine[0] == '#' {
+	if len(rawLine) == 0 {
 		return nil, nil
 	}
 
 	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
+	commented := false
 
-	bindType, bindContent, found := strings.Cut(strings.TrimSpace(rawLine), "=")
-	if !found {
+	if rawLine[0] == '#' {
+		commented = true
+		rawLine = rawLine[1:]
+	}
+
+	bindDefinition, bindContent, found := strings.Cut(strings.TrimSpace(rawLine), "=")
+	if !found && !commented {
 		return nil, errorMsg
 	}
 
+	if !found && commented {
+		return nil, nil
+	}
+
+	if !(strings.Contains(bindDefinition, "bind")) {
+		return nil, errorMsg
+	}
+
+	bindDefinition = strings.TrimSpace(bindDefinition)
 	bindContent = strings.TrimSpace(bindContent)
-	bindType = strings.TrimSpace(bindType)
-	bindTypeLen := len(bindType)
-
-	if !(strings.Contains(bindType, "bind")) {
-		return nil, errorMsg
+	bindFlags := []string{}
+	bindDefinitionLen := len(bindDefinition)
+	bind := Bind{
+		BindCore:   BindCore{},
+		LineNumber: bindLineNumber,
+		RawLine:    rawLine,
+		Flags:      []string{},
+		Type:       normal,
 	}
 
-	if strings.HasPrefix(bindType, "un") {
-		bind, err := parseUnbind(bindContent)
+	if strings.HasPrefix(bindDefinition, "un") {
+		bindCore, err := parseUnbind(bindContent)
 		if err != nil {
 			return nil, errorMsg
 		}
 
-		return &Bind{
-			BindCore:   *bind,
-			LineNumber: bindLineNumber,
-			RawLine:    rawLine,
-			Flags:      []string{},
-		}, nil
+		bind.BindCore = *bindCore
+		bind.Type = unbind
 
+		return &bind, nil
 	}
 
-	bindFlags := ""
-	if bindTypeLen != 4 {
-		bindFlags = bindType[4:]
+	if bindDefinitionLen != 4 {
+		bindFlags = strings.Split(bindDefinition[4:], "")
 	}
 
-	if strings.Contains(bindFlags, "s") {
-		return nil, fmt.Errorf("for now binds with the 's' flag are not parsed! Line: %d, Raw line: %s", bindLineNumber, rawLine)
+	if slices.Contains(bindFlags, "s") {
+		return nil, fmt.Errorf("for now binds with the 's' flag are not supported! Line: %d, Raw line: %s", bindLineNumber, rawLine)
 	}
 
-	bind, err := parseBindContent(bindContent)
+	if commented {
+		bindCore, err := parseBindContent(bindContent)
+
+		if err != nil {
+			return nil, nil
+		}
+
+		bind.BindCore = *bindCore
+		bind.Type = comment
+
+		return &bind, nil
+	}
+
+	bindCore, err := parseBindContent(bindContent)
 	if err != nil {
 		return nil, errorMsg
 	}
 
-	return &Bind{
-		BindCore:   *bind,
-		LineNumber: bindLineNumber,
-		RawLine:    rawLine,
-		Flags:      strings.Split(bindFlags, ""),
-	}, nil
+	bind.BindCore = *bindCore
+	bind.Flags = bindFlags
+
+	return &bind, nil
 }
 
 func parseUnbind(unbind string) (*BindCore, error) {
@@ -134,7 +167,7 @@ func parseUnbind(unbind string) (*BindCore, error) {
 			ModKeys: modKeys,
 			Key:     key,
 		},
-		ActionType:  "unbind",
+		ActionType:  "",
 		Action:      "",
 		Description: "",
 	}, nil
@@ -173,7 +206,6 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 		Action:      action,
 		Description: description,
 	}, nil
-
 }
 
 func parseModKeys(modKeys string) []string {
@@ -245,8 +277,21 @@ func (b Bind) KeybindToRow() []string {
 		shortcut = b.Shortcut.Key
 	}
 
+	var bindTypeString string
+	switch b.Type {
+	case normal:
+		bindTypeString = "Normal"
+
+	case unbind:
+		bindTypeString = "Unbind"
+
+	case comment:
+		bindTypeString = "Commented"
+	}
+
 	return []string{
 		shortcut,
+		bindTypeString,
 		b.Description,
 		b.ActionType,
 		strings.Join(b.Flags, ", "),
