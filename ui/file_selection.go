@@ -1,12 +1,12 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
+	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -30,7 +30,7 @@ type FileSelection struct {
 	mode             mode
 	selectedFilePath string
 	selectedFileName string
-	message          string
+	msgs.InfoModel
 }
 
 func InitFileSelection(path *string, configuration *config.Configuration) *FileSelection {
@@ -57,7 +57,7 @@ func InitFileSelection(path *string, configuration *config.Configuration) *FileS
 		mode:             navigating,
 		selectedFilePath: "",
 		selectedFileName: "",
-		message:          "",
+		InfoModel:        msgs.GetDefaultInfoModel(),
 	}
 
 	items := model.filesToItems()
@@ -83,10 +83,21 @@ func (m FileSelection) Init() tea.Cmd {
 
 func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case msgs.ErrorMsg:
+		m.Message = nil
+		m.Error = &msg.Message
+
+	case msgs.MessageMsg:
+		m.Error = nil
+		m.Message = &msg.Message
+
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
 		m.setListSize()
 	case tea.KeyMsg:
+		m.Message = nil
+		m.Error = nil
+
 		if msg.String() == "ctrl+c" {
 			m.config.SaveConfiguration()
 			return m, tea.Quit
@@ -103,7 +114,8 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSelection) View() string {
-	title := fmt.Sprintf("Binds Editor | File Selection%s\n\n", m.message)
+	title := "Binds Editor"
+	title += m.GetStyledMessage()
 
 	if m.input.Focused() {
 		return consts.FullScreenStyle.Render(title + m.list.View() + "\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()) + "\n" + m.input.View())
@@ -164,7 +176,8 @@ func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 		}
 
 		if err != nil {
-			m.message = err.Error()
+			error := err.Error()
+			m.Error = &error
 		}
 
 		m.selectedFileName = ""
@@ -201,10 +214,29 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 	case msg.String() == "esc":
 		return m, cmd
 
+	case key.Matches(msg, keys.FileSelectionKeys.Select):
+		selectedItem := m.list.SelectedItem()
+		if selectedItem == nil {
+			return m, nil
+		}
+
+		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
+		if selectedFileIdx == -1 {
+			return m, nil
+		}
+
+		selectedFile := m.config.Files[selectedFileIdx]
+		if selectedFile == nil {
+			return m, nil
+		}
+
+		return InitTable(selectedFile, m.config)
+
 	case key.Matches(msg, keys.FileSelectionKeys.Save):
 		err := m.config.SaveConfiguration()
 		if err != nil {
-			m.message = err.Error()
+			error := err.Error()
+			m.Error = &error
 		}
 		return m, nil
 
@@ -219,7 +251,8 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 
 		err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
 		if err != nil {
-			m.message = err.Error()
+			error := err.Error()
+			m.Error = &error
 		}
 
 		m.list.SetItems(m.filesToItems())

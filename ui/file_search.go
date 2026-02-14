@@ -1,12 +1,12 @@
 package ui
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
+	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -18,8 +18,8 @@ type FileSearch struct {
 	filePicker     filepicker.Model
 	help           help.Model
 	config         *configuration.Configuration
-	message        string
 	emptyDirectory bool
+	msgs.InfoModel
 }
 
 func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, tea.Cmd) {
@@ -37,8 +37,8 @@ func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, te
 		filePicker:     fp,
 		help:           h,
 		config:         configuration,
-		message:        "",
 		emptyDirectory: false,
+		InfoModel:      msgs.GetDefaultInfoModel(),
 	}
 
 	if consts.WindowSize.Height != 0 {
@@ -61,6 +61,9 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setFilePickerHeight()
 		return m, nil
 	case tea.KeyMsg:
+		m.Message = nil
+		m.Error = nil
+
 		switch {
 		case key.Matches(msg, keys.CoreKeys.Close):
 			return m, tea.Quit
@@ -105,7 +108,9 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSearch) View() string {
-	title := fmt.Sprintf("Binds Editor | File Searching%s\n\n", m.message)
+	title := "Binds Editor"
+
+	title += m.GetStyledMessage()
 
 	if m.emptyDirectory {
 		return consts.FullScreenFileSearchStyle.Render(title + m.filePicker.View() + lipgloss.NewStyle().MarginTop(1).Render(m.help.FullHelpView(keys.FilePickerKeys.FullHelp())))

@@ -1,8 +1,7 @@
 package ui
 
 import (
-	"fmt"
-
+	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	"github.com/araujofs/binds-editor/files"
 	keys "github.com/araujofs/binds-editor/help"
@@ -17,10 +16,10 @@ import (
 
 var (
 	paddingStyle = lipgloss.NewStyle().Padding(0, consts.DefaultPadding)
-	tableStyle   = lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderBottomForeground(lipgloss.Color("240"))
+	// tableStyle   = lipgloss.NewStyle().
+	// 		BorderStyle(lipgloss.NormalBorder()).
+	// 		BorderBottom(true).
+	// 		BorderBottomForeground(lipgloss.Color("240"))
 )
 
 type Table struct {
@@ -29,14 +28,15 @@ type Table struct {
 	table  table.Model
 	help   help.Model
 	keys   keys.TableKeyMap
+	config *config.Configuration
+	msgs.InfoModel
 }
 
-func InitTable() (*Table, tea.Msg) {
-	binds, err := files.ReadBindsFile("/home/arthur/.config/hypr/bindings.conf")
+func InitTable(selectedFile *config.File, configuration *config.Configuration) (tea.Model, tea.Cmd) {
+	binds, err := files.ReadBindsFile(selectedFile.Path)
 
 	if err != nil {
-		fmt.Printf("%s", err)
-		return nil, func() tea.Msg { return msgs.NewErrorMsg(err) }
+		return InitFileSelection(nil, configuration), msgs.SendErrorMsg(err.Error())
 	}
 
 	columns := []table.Column{
@@ -56,7 +56,6 @@ func InitTable() (*Table, tea.Msg) {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(getTableHeight(len(rows))),
 		table.WithKeyMap(table.DefaultKeyMap()),
 	)
 
@@ -77,13 +76,19 @@ func InitTable() (*Table, tea.Msg) {
 
 	t.SetStyles(s)
 
-	return &Table{
-		binds:  binds,
-		cursor: 0,
-		table:  t,
-		help:   help.New(),
-		keys:   keys.TableKeys,
-	}, nil
+	model := &Table{
+		binds:     binds,
+		cursor:    0,
+		table:     t,
+		help:      help.New(),
+		keys:      keys.TableKeys,
+		config:    configuration,
+		InfoModel: msgs.GetDefaultInfoModel(),
+	}
+
+	model.setTableHeight()
+
+	return model, nil
 }
 
 func (m Table) Init() tea.Cmd {
@@ -94,10 +99,22 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case msgs.ErrorMsg:
+		m.Message = nil
+		m.Error = &msg.Message
+
+	case msgs.MessageMsg:
+		m.Error = nil
+		m.Message = &msg.Message
+
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
-		m.table.SetHeight(getTableHeight(len(m.table.Rows())))
+		m.setTableHeight()
+
 	case tea.KeyMsg:
+		m.Message = nil
+		m.Error = nil
+
 		switch {
 		case key.Matches(msg, m.keys.Close):
 			return m, tea.Quit
@@ -106,9 +123,13 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case key.Matches(msg, m.keys.Down):
+			testing := "TESTANDO"
+			m.Error = &testing
 			if m.cursor < len(m.binds)-1 {
 				m.cursor++
 			}
+		case key.Matches(msg, m.keys.GoBack):
+			return InitFileSelection(nil, m.config), nil
 		}
 		m.table, cmd = m.table.Update(msg)
 	}
@@ -117,6 +138,9 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Table) View() string {
+	title := "Binds Editor"
+
+	title += m.GetStyledMessage()
 
 	width := consts.WindowSize.Width - consts.DefaultPadding
 
@@ -129,14 +153,12 @@ func (m Table) View() string {
 
 	m.table.SetColumns(columns)
 
-	helpView := "\n" + m.help.View(m.keys)
-	return paddingStyle.Render("Binds Editor | Binds: " + fmt.Sprint(len(m.binds)) + "\n" + tableStyle.Render(m.table.View()) + helpView + "\n")
+	helpView := "\n" + m.help.FullHelpView(m.keys.FullHelp())
+	return paddingStyle.Render(title + m.table.View() + helpView)
 }
 
-func getTableHeight(rowsSize int) int {
-	var tableHeight int
+func (m *Table) setTableHeight() {
+	fixedWindow := consts.WindowSize.Height - consts.DefaultPadding - 2
 
-	tableHeight = min(consts.WindowSize.Height-consts.DefaultPadding-1, rowsSize)
-
-	return tableHeight
+	m.table.SetHeight(fixedWindow)
 }

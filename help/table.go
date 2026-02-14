@@ -6,17 +6,16 @@ import (
 
 type TableKeyMap struct {
 	CommonKeyMap
-	Create, Delete, Edit, Unbind key.Binding
+	Create, Delete, Edit, Unbind, GoBack key.Binding
 }
 
 func (k TableKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Create, k.Delete, k.Edit, k.Unbind, k.Close}
+	return []key.Binding{k.Up, k.Down, k.Create, k.Delete, k.Edit, k.Unbind, k.Close, k.GoBack}
 }
 
 func (k TableKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Create, k.Delete, k.Edit, k.Unbind, k.Close}}
+	return [][]key.Binding{{k.Up, k.Down, k.Create}, {k.Delete, k.Edit, k.Unbind}, {k.Close}}
 }
-
 
 var TableKeys = TableKeyMap{
 	CommonKeys,
@@ -36,5 +35,8 @@ var TableKeys = TableKeyMap{
 		key.WithKeys("u"),
 		key.WithHelp("u", "unbind"),
 	),
+	key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "go to previous page"),
+	),
 }
-
