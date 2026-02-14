@@ -34,6 +34,7 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 		return nil, err
 	}
 	defer f.Close()
+
 	bindings := make([]*Bind, 0, 50)
 
 	scanner := bufio.NewScanner(f)
@@ -44,8 +45,11 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 
 		line := scanner.Text()
 		bind, err := parseBind(line, lineNumber)
+		if err != nil {
+			return nil, err
+		}
 
-		if err == nil && bind != nil {
+		if bind != nil {
 			bindings = append(bindings, bind)
 		}
 	}
@@ -61,7 +65,6 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
 
 	bindType, bindContent, found := strings.Cut(strings.TrimSpace(rawLine), "=")
-
 	if !found {
 		return nil, errorMsg
 	}
@@ -74,8 +77,22 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		return nil, errorMsg
 	}
 
-	bindFlags := ""
+	if strings.HasPrefix(bindType, "un") {
+		bind, err := parseUnbind(bindContent)
+		if err != nil {
+			return nil, errorMsg
+		}
 
+		return &Bind{
+			BindCore:   *bind,
+			LineNumber: bindLineNumber,
+			RawLine:    rawLine,
+			Flags:      []string{},
+		}, nil
+
+	}
+
+	bindFlags := ""
 	if bindTypeLen != 4 {
 		bindFlags = bindType[4:]
 	}
@@ -85,9 +102,8 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 	}
 
 	bind, err := parseBindContent(bindContent)
-
 	if err != nil {
-		return nil, err
+		return nil, errorMsg
 	}
 
 	return &Bind{
@@ -95,6 +111,32 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		LineNumber: bindLineNumber,
 		RawLine:    rawLine,
 		Flags:      strings.Split(bindFlags, ""),
+	}, nil
+}
+
+func parseUnbind(unbind string) (*BindCore, error) {
+	parts := strings.Split(unbind, ",")
+	partsLen := len(parts)
+
+	if partsLen != 2 {
+		return nil, fmt.Errorf("invalid bind format")
+	}
+
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+
+	modKeys := parseModKeys(parts[0])
+	key := parts[1]
+
+	return &BindCore{
+		Shortcut: Shortcut{
+			ModKeys: modKeys,
+			Key:     key,
+		},
+		ActionType:  "unbind",
+		Action:      "",
+		Description: "",
 	}, nil
 }
 
