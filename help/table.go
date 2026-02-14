@@ -14,7 +14,7 @@ func (k TableKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k TableKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.Create}, {k.Delete, k.Edit, k.Unbind}, {k.Close}}
+	return [][]key.Binding{{k.Up, k.Down, k.Create}, {k.Delete, k.Edit, k.Unbind}, {k.Close, k.GoBack}}
 }
 
 var TableKeys = TableKeyMap{

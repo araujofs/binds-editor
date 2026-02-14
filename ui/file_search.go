@@ -5,6 +5,7 @@ import (
 
 	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
+	"github.com/araujofs/binds-editor/files"
 	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -60,6 +61,15 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		consts.WindowSize = msg
 		m.setFilePickerHeight()
 		return m, nil
+
+	case msgs.ErrorMsg:
+		m.Message = nil
+		m.Error = &msg.Message
+
+	case msgs.MessageMsg:
+		m.Error = nil
+		m.Message = &msg.Message
+
 	case tea.KeyMsg:
 		m.Message = nil
 		m.Error = nil
@@ -72,6 +82,10 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
 			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
+				if _, err := files.ReadBindsFile(path); err != nil {
+					return m, msgs.SendErrorMsg(err.Error())
+				}
+
 				selection := InitFileSelection(&path, m.config)
 
 				return selection, nil
@@ -108,7 +122,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSearch) View() string {
-	title := "Binds Editor"
+	title := "Binds Editor | Search File"
 
 	title += m.GetStyledMessage()
 

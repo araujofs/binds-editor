@@ -123,8 +123,6 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case key.Matches(msg, m.keys.Down):
-			testing := "TESTANDO"
-			m.Error = &testing
 			if m.cursor < len(m.binds)-1 {
 				m.cursor++
 			}
@@ -138,7 +136,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Table) View() string {
-	title := "Binds Editor"
+	title := "Binds Editor | Bindings"
 
 	title += m.GetStyledMessage()
 
@@ -158,7 +156,7 @@ func (m Table) View() string {
 }
 
 func (m *Table) setTableHeight() {
-	fixedWindow := consts.WindowSize.Height - consts.DefaultPadding - 2
+	fixedWindow := consts.WindowSize.Height - consts.DefaultPadding - 3
 
 	m.table.SetHeight(fixedWindow)
 }

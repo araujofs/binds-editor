@@ -114,7 +114,7 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FileSelection) View() string {
-	title := "Binds Editor"
+	title := "Binds Editor | Select File"
 	title += m.GetStyledMessage()
 
 	if m.input.Focused() {
@@ -176,8 +176,7 @@ func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 		}
 
 		if err != nil {
-			error := err.Error()
-			m.Error = &error
+			cmd = msgs.SendErrorMsg(err.Error())
 		}
 
 		m.selectedFileName = ""
@@ -185,7 +184,7 @@ func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 		m.mode = navigating
 		m.list.SetItems(m.filesToItems())
 
-		return m, nil
+		return m, cmd
 
 	case key.Matches(msg, keys.FileSelectionInputKeys.Back):
 		m.input.SetValue("")
@@ -222,7 +221,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 
 		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
 		if selectedFileIdx == -1 {
-			return m, nil
+			return m, msgs.SendErrorMsg("selected file doesn't exist in your configuration")
 		}
 
 		selectedFile := m.config.Files[selectedFileIdx]
@@ -235,10 +234,9 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FileSelectionKeys.Save):
 		err := m.config.SaveConfiguration()
 		if err != nil {
-			error := err.Error()
-			m.Error = &error
+			cmd = msgs.SendErrorMsg(err.Error())
 		}
-		return m, nil
+		return m, cmd
 
 	case key.Matches(msg, keys.FileSelectionKeys.Add):
 		return InitFileSearch(m.config)
@@ -251,13 +249,13 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 
 		err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
 		if err != nil {
-			error := err.Error()
-			m.Error = &error
+			cmd = msgs.SendErrorMsg(err.Error())
+			return m, cmd
 		}
 
 		m.list.SetItems(m.filesToItems())
 
-		return m, nil
+		return m, cmd
 
 	case key.Matches(msg, keys.FileSelectionKeys.Edit):
 		selectedItem := m.list.SelectedItem()
@@ -267,7 +265,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 
 		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
 		if selectedFileIdx == -1 {
-			return m, nil
+			return m, msgs.SendErrorMsg("selected file doesn't exist in your configuration")
 		}
 
 		selectedFile := m.config.Files[selectedFileIdx]
