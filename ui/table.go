@@ -1,9 +1,9 @@
 package ui
 
 import (
+	"github.com/araujofs/binds-editor/binds"
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
-	"github.com/araujofs/binds-editor/files"
 	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
 
@@ -23,7 +23,7 @@ var (
 )
 
 type Table struct {
-	binds  []*files.Bind
+	binds  []*binds.Bind
 	cursor int
 	table  table.Model
 	help   help.Model
@@ -32,7 +32,7 @@ type Table struct {
 }
 
 func InitTable(selectedFile *config.File, configuration *config.Configuration) (tea.Model, tea.Cmd) {
-	binds, err := files.ReadBindsFile(selectedFile.Path)
+	binds, err := binds.ReadBindsFile(selectedFile.Path)
 
 	if err != nil {
 		return InitFileSelection(nil, configuration), msgs.SendErrorMsg(err.Error())
@@ -121,20 +121,22 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case key.Matches(msg, keys.TableKeys.Up):
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			break
 
 		case key.Matches(msg, keys.TableKeys.Down):
-			if m.cursor < len(m.binds)-1 {
-				m.cursor++
-			}
+			break
 
 		case key.Matches(msg, keys.TableKeys.Create):
 			return m, nil
 
 		case key.Matches(msg, keys.TableKeys.Edit):
-			return m, nil
+			if len(m.binds) <= 0 {
+				return m, nil
+			}
+
+			selectedBind := m.binds[m.table.Cursor()]
+
+			return InitEdit(selectedBind), nil
 
 		case key.Matches(msg, keys.TableKeys.Delete):
 			return m, nil

@@ -8,34 +8,6 @@ import (
 	"strings"
 )
 
-type BindType int
-
-const (
-	normal BindType = iota + 1
-	unbind
-	comment
-)
-
-type Shortcut struct {
-	ModKeys []string
-	Key     string
-}
-
-type Bind struct {
-	BindCore
-	LineNumber int
-	RawLine    string
-	Flags      []string
-	Type       BindType
-}
-
-type BindCore struct {
-	Shortcut    Shortcut
-	ActionType  string
-	Action      string
-	Description string
-}
-
 func ReadBindsFile(path string) ([]*Bind, error) {
 	f, err := os.Open(path)
 	if err != nil {

@@ -3,9 +3,9 @@ package ui
 import (
 	"os"
 
+	"github.com/araujofs/binds-editor/binds"
 	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
-	"github.com/araujofs/binds-editor/files"
 	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -82,7 +82,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
 			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
-				if _, err := files.ReadBindsFile(path); err != nil {
+				if _, err := binds.ReadBindsFile(path); err != nil {
 					return m, msgs.SendErrorMsg(err.Error())
 				}
 
