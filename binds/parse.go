@@ -1,4 +1,4 @@
-package files
+package binds
 
 import (
 	"bufio"
