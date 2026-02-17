@@ -42,15 +42,17 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		return nil, nil
 	}
 
+	rawLine = strings.Trim(rawLine, " ")
+
 	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
 	commented := false
 
-	if rawLine[0] == '#' {
+	if strings.HasPrefix(rawLine, "#") {
 		commented = true
-		rawLine = rawLine[1:]
+		rawLine = strings.TrimPrefix(rawLine, "#")
 	}
 
-	bindDefinition, bindContent, found := strings.Cut(strings.TrimSpace(rawLine), "=")
+	bindDefinition, bindContent, found := strings.Cut(rawLine, "=")
 	if !found && !commented {
 		return nil, errorMsg
 	}
@@ -59,20 +61,21 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		return nil, nil
 	}
 
-	if !(strings.Contains(bindDefinition, "bind")) {
+	if !commented && !(strings.Contains(bindDefinition, "bind")) {
 		return nil, errorMsg
 	}
 
 	bindDefinition = strings.TrimSpace(bindDefinition)
 	bindContent = strings.TrimSpace(bindContent)
-	bindFlags := []string{}
+	bindFlags := []*Flag{}
 	bindDefinitionLen := len(bindDefinition)
 	bind := Bind{
-		BindCore:   BindCore{},
+		BindCore: BindCore{
+			Flags: []*Flag{},
+			Type:  Normal,
+		},
 		LineNumber: bindLineNumber,
 		RawLine:    rawLine,
-		Flags:      []string{},
-		Type:       normal,
 	}
 
 	if strings.HasPrefix(bindDefinition, "un") {
@@ -82,17 +85,23 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		}
 
 		bind.BindCore = *bindCore
-		bind.Type = unbind
+		bind.Type = Unbind
 
 		return &bind, nil
 	}
 
 	if bindDefinitionLen != 4 {
-		bindFlags = strings.Split(bindDefinition[4:], "")
-	}
+		bindFlagsStrings := strings.Split(bindDefinition[4:], "")
+		if slices.Contains(bindFlagsStrings, "s") {
+			// return nil, fmt.Errorf("for now binds with the 's' flag are not supported! Line: %d, Raw line: %s", bindLineNumber, rawLine)
+			return nil, nil
+		}
 
-	if slices.Contains(bindFlags, "s") {
-		return nil, fmt.Errorf("for now binds with the 's' flag are not supported! Line: %d, Raw line: %s", bindLineNumber, rawLine)
+		for _, bindFlag := range bindFlagsStrings {
+			if flag, ok := DefaultFlags[bindFlag]; ok {
+				bindFlags = append(bindFlags, flag)
+			}
+		}
 	}
 
 	if commented {
@@ -103,7 +112,8 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		}
 
 		bind.BindCore = *bindCore
-		bind.Type = comment
+		bind.Type = Comment
+		bind.Flags = bindFlags
 
 		return &bind, nil
 	}
@@ -139,7 +149,7 @@ func parseUnbind(unbind string) (*BindCore, error) {
 			ModKeys: modKeys,
 			Key:     key,
 		},
-		ActionType:  "",
+		Dispatcher:  "",
 		Action:      "",
 		Description: "",
 	}, nil
@@ -160,11 +170,11 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 	modKeys := parseModKeys(parts[0])
 	key := parts[1]
 	action := parts[3]
-	actionType := parts[2]
+	dispatcher := parts[2]
 	var description string
 
 	if partsLen == 5 {
-		actionType = parts[3]
+		dispatcher = parts[3]
 		action = parts[4]
 		description = parts[2]
 	}
@@ -174,9 +184,10 @@ func parseBindContent(bindContent string) (*BindCore, error) {
 			ModKeys: modKeys,
 			Key:     key,
 		},
-		ActionType:  actionType,
+		Dispatcher:  dispatcher,
 		Action:      action,
 		Description: description,
+		Type:        Normal,
 	}, nil
 }
 
@@ -189,52 +200,10 @@ func parseModKeys(modKeys string) []string {
 	separatedModKeys := []string{}
 
 	// it needs to be like that because hyprland doesnt define an especific separator
-	if strings.Contains(s, "SHIFT") {
-		separatedModKeys = append(separatedModKeys, "SHIFT")
-	}
-
-	if strings.Contains(s, "CAPS") {
-		separatedModKeys = append(separatedModKeys, "CAPS")
-	}
-
-	if strings.Contains(s, "CTRL") {
-		separatedModKeys = append(separatedModKeys, "CTRL")
-	}
-
-	if strings.Contains(s, "CONTROL") {
-		separatedModKeys = append(separatedModKeys, "CONTROL")
-	}
-
-	if strings.Contains(s, "ALT") {
-		separatedModKeys = append(separatedModKeys, "ALT")
-	}
-
-	if strings.Contains(s, "MOD2") {
-		separatedModKeys = append(separatedModKeys, "MOD2")
-	}
-
-	if strings.Contains(s, "MOD3") {
-		separatedModKeys = append(separatedModKeys, "MOD3")
-	}
-
-	if strings.Contains(s, "SUPER") {
-		separatedModKeys = append(separatedModKeys, "SUPER")
-	}
-
-	if strings.Contains(s, "WIN") {
-		separatedModKeys = append(separatedModKeys, "WIN")
-	}
-
-	if strings.Contains(s, "LOGO") {
-		separatedModKeys = append(separatedModKeys, "LOGO")
-	}
-
-	if strings.Contains(s, "MOD4") {
-		separatedModKeys = append(separatedModKeys, "MOD4")
-	}
-
-	if strings.Contains(s, "MOD5") {
-		separatedModKeys = append(separatedModKeys, "MOD5")
+	for _, modKey := range ModKeys {
+		if strings.Contains(s, modKey) {
+			separatedModKeys = append(separatedModKeys, modKey)
+		}
 	}
 
 	return separatedModKeys
@@ -251,21 +220,28 @@ func (b Bind) KeybindToRow() []string {
 
 	var bindTypeString string
 	switch b.Type {
-	case normal:
+	case Normal:
 		bindTypeString = "Normal"
 
-	case unbind:
+	case Unbind:
 		bindTypeString = "Unbind"
 
-	case comment:
+	case Comment:
 		bindTypeString = "Commented"
+	}
+
+	var flags []string
+	for _, flag := range b.Flags {
+		flags = append(flags, flag.Flag)
 	}
 
 	return []string{
 		shortcut,
 		bindTypeString,
 		b.Description,
-		b.ActionType,
-		strings.Join(b.Flags, ", "),
+		b.Dispatcher,
+		strings.Join(flags, ", "),
 	}
 }
+
+func (b Bind) KeybindToRawLine() string

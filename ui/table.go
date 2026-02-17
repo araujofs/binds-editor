@@ -136,7 +136,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			selectedBind := m.binds[m.table.Cursor()]
 
-			return InitEdit(selectedBind), nil
+			return InitEdit(selectedBind)
 
 		case key.Matches(msg, keys.TableKeys.Delete):
 			return m, nil
