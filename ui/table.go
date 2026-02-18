@@ -23,11 +23,12 @@ var (
 )
 
 type Table struct {
-	binds  []*binds.Bind
-	cursor int
-	table  table.Model
-	help   help.Model
-	config *config.Configuration
+	binds        []*binds.Bind
+	cursor       int
+	table        table.Model
+	help         help.Model
+	config       *config.Configuration
+	selectedFile *config.File
 	msgs.InfoModel
 }
 
@@ -79,12 +80,13 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 	t.SetStyles(s)
 
 	model := &Table{
-		binds:     binds,
-		cursor:    0,
-		table:     t,
-		help:      help.New(),
-		config:    configuration,
-		InfoModel: msgs.GetDefaultInfoModel(),
+		binds:        binds,
+		cursor:       0,
+		table:        t,
+		help:         help.New(),
+		config:       configuration,
+		selectedFile: selectedFile,
+		InfoModel:    msgs.GetDefaultInfoModel(),
 	}
 
 	model.setTableHeight()
@@ -136,7 +138,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			selectedBind := m.binds[m.table.Cursor()]
 
-			return InitEdit(selectedBind)
+			return InitEdit(selectedBind, m.selectedFile, m.config)
 
 		case key.Matches(msg, keys.TableKeys.Delete):
 			return m, nil

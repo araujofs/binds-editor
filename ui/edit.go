@@ -1,7 +1,11 @@
 package ui
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/araujofs/binds-editor/binds"
+	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/key"
@@ -10,20 +14,27 @@ import (
 )
 
 type Edit struct {
-	form         *huh.Form
-	originalBind *binds.Bind
-	newBind      binds.Bind
-	formKeys     *huh.KeyMap
-	confirmed    bool
+	form          *huh.Form
+	originalBind  *binds.Bind
+	newBind       *binds.Bind
+	formKeys      *huh.KeyMap
+	confirmed     *bool
+	selectedFile  *configuration.File
+	configuration *configuration.Configuration
 	msgs.InfoModel
 }
 
-func InitEdit(bind *binds.Bind) (tea.Model, tea.Cmd) {
+func InitEdit(bind *binds.Bind, selectedFile *configuration.File, config *configuration.Configuration) (tea.Model, tea.Cmd) {
+	confirmed := false
+	newBind := *bind
+
 	model := &Edit{
-		originalBind: bind,
-		newBind:      *bind,
-		formKeys:     huh.NewDefaultKeyMap(),
-		confirmed:    false,
+		originalBind:  bind,
+		newBind:       &newBind,
+		formKeys:      huh.NewDefaultKeyMap(),
+		confirmed:     &confirmed,
+		selectedFile:  selectedFile,
+		configuration: config,
 	}
 
 	model.createForm()
@@ -70,11 +81,21 @@ func (m Edit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	if m.form.State == huh.StateCompleted && m.confirmed {
-		cmds = append(cmds, msgs.SendMessageMsg("Nao confirmado"))
+	if m.form.State == huh.StateCompleted && *m.confirmed {
+		// cmds = append(cmds, msgs.SendMessageMsg("Entered confirmed"))
+		err := m.newBind.ReplaceInFile(m.selectedFile.Path)
+		if err != nil {
+			cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
+			return m, tea.Batch(cmds...)
+		}
+
+		model, cmd := InitTable(m.selectedFile, m.configuration)
+		cmds = append(cmds, cmd, msgs.SendMessageMsg(fmt.Sprintf("bind edited on line %d", m.newBind.LineNumber)))
+
+		return model, cmd
 	}
 
-	if m.form.State == huh.StateCompleted && !m.confirmed {
+	if m.form.State == huh.StateCompleted && !*m.confirmed {
 		m.createForm()
 		cmds = append(cmds, m.form.Init())
 	}
@@ -121,18 +142,24 @@ func (e *Edit) createForm() {
 			huh.NewMultiSelect[*binds.Flag]().Title("Flags").Value(&e.newBind.Flags).Options(
 				getFlagOptions()...,
 			),
-			huh.NewInput().Title("Dispatcher").Value(&e.newBind.Dispatcher),
-			huh.NewInput().Title("Action").Value(&e.newBind.Action),
-			huh.NewInput().Title("Description").Value(&e.originalBind.Description),
-		),
-		huh.NewGroup(
 			huh.NewMultiSelect[string]().Title("Mod keys").Value(&e.newBind.Shortcut.ModKeys).Options(
 				getModKeysOptions()...,
 			),
-			huh.NewInput().Title("Main key").Value(&e.newBind.Shortcut.Key),
+			huh.NewInput().Title("Main key").Value(&e.newBind.Shortcut.Key).CharLimit(1),
 		),
 		huh.NewGroup(
-			huh.NewConfirm().Key("confirm").Title("Confirm edit?").Affirmative("Yes!").Negative("No.").Value(&e.confirmed),
+			huh.NewInput().Title("Dispatcher").Value(&e.newBind.Dispatcher),
+			huh.NewInput().Title("Action").Value(&e.newBind.Action),
+		),
+		huh.NewGroup(
+			huh.NewInput().Title("Description").Value(&e.originalBind.Description),
+		).WithHideFunc(
+			func() bool {
+				return !slices.Contains(e.newBind.Flags, binds.DefaultFlags["d"])
+			},
+		),
+		huh.NewGroup(
+			huh.NewConfirm().Title("Confirm edit?").Affirmative("Yes!").Negative("No.").Value(e.confirmed),
 		),
 	).WithHeight(consts.WindowSize.Height - top - bottom - 3)
 }
