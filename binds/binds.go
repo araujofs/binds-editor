@@ -1,5 +1,13 @@
 package binds
 
+import (
+	"fmt"
+	"io"
+	"os"
+	"slices"
+	"strings"
+)
+
 type BindType int
 
 const (
@@ -67,8 +75,162 @@ type Bind struct {
 	RawLine    string
 }
 
-func (b *Bind) Edit(newBind Bind) {
-	if flags := newBind.Flags; flags != nil {
-		b.Flags = flags
+func (b Bind) ReplaceInFile(path string) error {
+	// ler o arquivo
+	content, err := os.ReadFile(path)
+	if err != nil && err != io.EOF {
+		return err
 	}
+
+	// separar por linhas
+	lines := strings.Split(string(content), "\n")
+
+	// transformar bind em linha
+	newBindLine, err := b.KeybindToLine()
+	if err != nil {
+		return err
+	}
+
+	// substituir linha antiga por nova linha
+	lines[b.LineNumber] = *newBindLine
+
+	// transformar linhas em bytes
+	content = []byte(strings.Join(lines, "\n"))
+
+	// sobrescrever arquivo
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(content)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b Bind) KeybindToRow() []string {
+	var shortcut = ""
+
+	if joinedModKeys := strings.Join(b.Shortcut.ModKeys, "+"); joinedModKeys != "" {
+		shortcut = strings.Join([]string{joinedModKeys, b.Shortcut.Key}, "+")
+	} else {
+		shortcut = b.Shortcut.Key
+	}
+
+	var bindTypeString string
+	switch b.Type {
+	case Normal:
+		bindTypeString = "Normal"
+
+	case Unbind:
+		bindTypeString = "Unbind"
+
+	case Comment:
+		bindTypeString = "Commented"
+	}
+
+	var flags []string
+	for _, flag := range b.Flags {
+		flags = append(flags, flag.Flag)
+	}
+
+	return []string{
+		shortcut,
+		bindTypeString,
+		b.Description,
+		b.Dispatcher,
+		strings.Join(flags, ", "),
+	}
+}
+
+func (b Bind) KeybindToLine() (*string, error) {
+	if valid, err := b.isBindValid(); !valid {
+		return nil, err
+	}
+
+	var bind strings.Builder
+	var bindDefinition strings.Builder
+	var bindContent strings.Builder
+
+	switch b.Type {
+	case Normal:
+		bindDefinition.WriteString("bind")
+	case Comment:
+		bindDefinition.WriteString("# bind")
+	case Unbind:
+		bindDefinition.WriteString("unbind")
+	}
+
+	if b.Type != Unbind {
+		for _, flag := range b.Flags {
+			bindDefinition.WriteString(flag.Flag)
+		}
+	}
+
+	bindContent.WriteString(strings.Join(b.Shortcut.ModKeys, " "))
+	bindContent.WriteString(", " + b.Shortcut.Key)
+
+	if b.Type != Unbind {
+		if slices.Contains(b.Flags, DefaultFlags["d"]) {
+			bindContent.WriteString(", " + b.Description)
+		}
+
+		bindContent.WriteString(", " + b.Dispatcher)
+		bindContent.WriteString(", " + b.Action)
+	}
+
+	bind.WriteString(bindDefinition.String())
+	bind.WriteString(" = " + bindContent.String())
+
+	bindLine := bind.String()
+
+	return &bindLine, nil
+}
+
+func (b Bind) isBindValid() (bool, error) {
+	missingProperties := []string{}
+
+	if b.Dispatcher == "" {
+		missingProperties = append(missingProperties, "dispatcher")
+	}
+
+	if b.Action == "" {
+		missingProperties = append(missingProperties, "action")
+	}
+
+	if b.Type == 0 {
+		missingProperties = append(missingProperties, "type")
+	}
+
+	if b.Shortcut.Key == "" {
+		missingProperties = append(missingProperties, "key")
+	}
+
+	if modKeys := b.Shortcut.ModKeys; modKeys == nil || len(modKeys) == 0 {
+		missingProperties = append(missingProperties, "mod keys")
+	}
+
+	if flags := b.Flags; flags != nil && len(flags) > 0 && slices.Contains(flags, DefaultFlags["d"]) && b.Description == "" {
+		missingProperties = append(missingProperties, "description")
+	}
+
+	if b.LineNumber == 0 {
+		missingProperties = append(missingProperties, "line number")
+	}
+
+	if b.RawLine == "" {
+		missingProperties = append(missingProperties, "raw line")
+	}
+
+	if len(missingProperties) != 0 {
+		missing := strings.Join(missingProperties, ", ")
+		errorMsg := fmt.Errorf("invalid bind, missing: %s", missing)
+
+		return false, errorMsg
+	}
+
+	return true, nil
 }
