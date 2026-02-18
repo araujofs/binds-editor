@@ -21,8 +21,6 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 
 	lineNumber := 0
 	for scanner.Scan() {
-		lineNumber++
-
 		line := scanner.Text()
 		bind, err := parseBind(line, lineNumber)
 		if err != nil {
@@ -32,6 +30,8 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 		if bind != nil {
 			bindings = append(bindings, bind)
 		}
+
+		lineNumber++
 	}
 
 	return bindings, nil
