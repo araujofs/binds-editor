@@ -73,11 +73,42 @@ type Bind struct {
 	BindCore
 	LineNumber int
 	RawLine    string
+	FilePath   string
 }
 
-func (b Bind) ReplaceInFile(path string) error {
+func (b Bind) AppendToFile() error {
+	content, err := os.ReadFile(b.FilePath)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	// separar por linhas
+	lines := strings.Split(string(content), "\n")
+	b.LineNumber = len(lines)
+
+	// transformar bind em linha
+	newBindLine, err := b.KeybindToLine()
+	if err != nil {
+		return err
+	}
+	b.RawLine = *newBindLine
+
+	file, err := os.OpenFile(b.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	_, err = file.WriteString("\n" + b.RawLine)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b Bind) ReplaceInFile(newBind Bind) error {
 	// ler o arquivo
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(b.FilePath)
 	if err != nil && err != io.EOF {
 		return err
 	}
@@ -86,7 +117,7 @@ func (b Bind) ReplaceInFile(path string) error {
 	lines := strings.Split(string(content), "\n")
 
 	// transformar bind em linha
-	newBindLine, err := b.KeybindToLine()
+	newBindLine, err := newBind.KeybindToLine()
 	if err != nil {
 		return err
 	}
@@ -98,7 +129,7 @@ func (b Bind) ReplaceInFile(path string) error {
 	content = []byte(strings.Join(lines, "\n"))
 
 	// sobrescrever arquivo
-	file, err := os.Create(path)
+	file, err := os.Create(b.FilePath)
 	if err != nil {
 		return err
 	}
@@ -219,10 +250,6 @@ func (b Bind) isBindValid() (bool, error) {
 
 	if b.LineNumber == 0 {
 		missingProperties = append(missingProperties, "line number")
-	}
-
-	if b.RawLine == "" {
-		missingProperties = append(missingProperties, "raw line")
 	}
 
 	if len(missingProperties) != 0 {

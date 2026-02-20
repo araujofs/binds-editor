@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/araujofs/binds-editor/binds"
-	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
@@ -23,20 +22,18 @@ var (
 )
 
 type Table struct {
-	binds        []*binds.Bind
-	cursor       int
-	table        table.Model
-	help         help.Model
-	config       *config.Configuration
-	selectedFile *config.File
+	binds  []*binds.Bind
+	cursor int
+	table  table.Model
+	help   help.Model
+	*consts.GlobalState
 	msgs.InfoModel
 }
 
-func InitTable(selectedFile *config.File, configuration *config.Configuration) (tea.Model, tea.Cmd) {
-	binds, err := binds.ReadBindsFile(selectedFile.Path)
-
+func InitTable(globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
+	binds, err := binds.ReadBindsFile(globalState.SelectedFile.Path)
 	if err != nil {
-		return InitFileSelection(nil, configuration), msgs.SendErrorMsg(err.Error())
+		return InitFileSelection(nil, globalState), msgs.SendErrorMsg(err.Error())
 	}
 
 	columns := []table.Column{
@@ -80,13 +77,12 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 	t.SetStyles(s)
 
 	model := &Table{
-		binds:        binds,
-		cursor:       0,
-		table:        t,
-		help:         help.New(),
-		config:       configuration,
-		selectedFile: selectedFile,
-		InfoModel:    msgs.GetDefaultInfoModel(),
+		binds:       binds,
+		cursor:      0,
+		table:       t,
+		help:        help.New(),
+		GlobalState: globalState,
+		InfoModel:   msgs.GetDefaultInfoModel(),
 	}
 
 	model.setTableHeight()
@@ -129,7 +125,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 
 		case key.Matches(msg, keys.TableKeys.Create):
-			return m, nil
+			return InitCreate(m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Edit):
 			if len(m.binds) <= 0 {
@@ -138,7 +134,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			selectedBind := m.binds[m.table.Cursor()]
 
-			return InitEdit(selectedBind, m.selectedFile, m.config)
+			return InitEdit(selectedBind, m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Delete):
 			return m, nil
@@ -153,7 +149,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.TableKeys.GoBack):
-			return InitFileSelection(nil, m.config), nil
+			return InitFileSelection(nil, m.GlobalState), nil
 
 		}
 

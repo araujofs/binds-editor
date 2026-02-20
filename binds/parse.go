@@ -22,7 +22,7 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 	lineNumber := 0
 	for scanner.Scan() {
 		line := scanner.Text()
-		bind, err := parseBind(line, lineNumber)
+		bind, err := parseBind(path, line, lineNumber)
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +37,7 @@ func ReadBindsFile(path string) ([]*Bind, error) {
 	return bindings, nil
 }
 
-func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
+func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
 	if len(rawLine) == 0 {
 		return nil, nil
 	}
@@ -76,6 +76,7 @@ func parseBind(rawLine string, bindLineNumber int) (*Bind, error) {
 		},
 		LineNumber: bindLineNumber,
 		RawLine:    rawLine,
+		FilePath:   path,
 	}
 
 	if strings.HasPrefix(bindDefinition, "un") {

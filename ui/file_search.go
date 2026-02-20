@@ -16,14 +16,15 @@ import (
 )
 
 type FileSearch struct {
-	filePicker     filepicker.Model
-	help           help.Model
+	filePicker filepicker.Model
+	help       help.Model
+	*consts.GlobalState
 	config         *configuration.Configuration
 	emptyDirectory bool
 	msgs.InfoModel
 }
 
-func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, tea.Cmd) {
+func InitFileSearch(globalState *consts.GlobalState) (*FileSearch, tea.Cmd) {
 	fp := filepicker.New()
 
 	fp.AllowedTypes = []string{".conf"}
@@ -37,7 +38,7 @@ func InitFileSearch(configuration *configuration.Configuration) (*FileSearch, te
 	m := FileSearch{
 		filePicker:     fp,
 		help:           h,
-		config:         configuration,
+		GlobalState:    globalState,
 		emptyDirectory: false,
 		InfoModel:      msgs.GetDefaultInfoModel(),
 	}
@@ -86,7 +87,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, msgs.SendErrorMsg(err.Error())
 				}
 
-				selection := InitFileSelection(&path, m.config)
+				selection := InitFileSelection(&path, m.GlobalState)
 
 				return selection, nil
 			}
@@ -106,7 +107,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.emptyDirectory = false
 
 		case key.Matches(msg, keys.FilePickerKeys.GoBack):
-			selection := InitFileSelection(nil, m.config)
+			selection := InitFileSelection(nil, m.GlobalState)
 
 			return selection, nil
 

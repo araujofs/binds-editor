@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/araujofs/binds-editor/binds"
-	"github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	msgs "github.com/araujofs/binds-editor/messages"
 	"github.com/charmbracelet/bubbles/key"
@@ -14,27 +13,25 @@ import (
 )
 
 type Edit struct {
-	form          *huh.Form
-	originalBind  *binds.Bind
-	newBind       *binds.Bind
-	formKeys      *huh.KeyMap
-	confirmed     *bool
-	selectedFile  *configuration.File
-	configuration *configuration.Configuration
+	form         *huh.Form
+	originalBind *binds.Bind
+	newBind      *binds.Bind
+	formKeys     *huh.KeyMap
+	confirmed    *bool
+	*consts.GlobalState
 	msgs.InfoModel
 }
 
-func InitEdit(bind *binds.Bind, selectedFile *configuration.File, config *configuration.Configuration) (tea.Model, tea.Cmd) {
+func InitEdit(bind *binds.Bind, globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
 	confirmed := false
 	newBind := *bind
 
 	model := &Edit{
-		originalBind:  bind,
-		newBind:       &newBind,
-		formKeys:      huh.NewDefaultKeyMap(),
-		confirmed:     &confirmed,
-		selectedFile:  selectedFile,
-		configuration: config,
+		originalBind: bind,
+		newBind:      &newBind,
+		formKeys:     huh.NewDefaultKeyMap(),
+		confirmed:    &confirmed,
+		GlobalState:  globalState,
 	}
 
 	model.createForm()
@@ -82,14 +79,13 @@ func (m Edit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.form.State == huh.StateCompleted && *m.confirmed {
-		// cmds = append(cmds, msgs.SendMessageMsg("Entered confirmed"))
-		err := m.newBind.ReplaceInFile(m.selectedFile.Path)
+		err := m.originalBind.ReplaceInFile(*m.newBind)
 		if err != nil {
 			cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
 			return m, tea.Batch(cmds...)
 		}
 
-		model, cmd := InitTable(m.selectedFile, m.configuration)
+		model, cmd := InitTable(m.GlobalState)
 		cmds = append(cmds, cmd, msgs.SendMessageMsg(fmt.Sprintf("bind edited on line %d", m.newBind.LineNumber)))
 
 		return model, cmd
@@ -104,7 +100,7 @@ func (m Edit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Edit) View() string {
-	title := "Binds Editor | Select File"
+	title := "Binds Editor | Edit Bind"
 	title += m.GetStyledMessage()
 
 	return consts.FullScreenStyle.Render(title + m.form.View())
