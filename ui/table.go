@@ -31,7 +31,7 @@ type Table struct {
 }
 
 func InitTable(globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
-	binds, err := binds.ReadBindsFile(globalState.SelectedFile.Path)
+	binds, err := binds.ParseBindsFile(globalState.SelectedFile.Path)
 	if err != nil {
 		return InitFileSelection(nil, globalState), msgs.SendErrorMsg(err.Error())
 	}
@@ -44,15 +44,9 @@ func InitTable(globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
 		{Title: "Flags", Width: 20},
 	}
 
-	rows := []table.Row{}
-
-	for _, bind := range binds {
-		rows = append(rows, bind.KeybindToRow())
-	}
-
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
+		table.WithRows(bindsToRows(binds)),
 		table.WithFocused(true),
 		table.WithKeyMap(table.DefaultKeyMap()),
 	)
@@ -98,6 +92,17 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case msgs.UpdateTableBindsMsg:
+		binds, err := binds.ParseBindsFile(m.GlobalState.SelectedFile.Path)
+		if err != nil {
+			return InitFileSelection(nil, m.GlobalState), msgs.SendErrorMsg(err.Error())
+		}
+
+		m.binds = binds
+		m.table.SetRows(bindsToRows(m.binds))
+
+		return m, nil
+
 	case msgs.ErrorMsg:
 		m.Message = nil
 		m.Error = &msg.Message
@@ -128,11 +133,10 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return InitCreate(m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Edit):
-			if len(m.binds) <= 0 {
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
 				return m, nil
 			}
-
-			selectedBind := m.binds[m.table.Cursor()]
 
 			return InitEdit(selectedBind, m.GlobalState)
 
@@ -140,10 +144,34 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.TableKeys.Unbind):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			if selectedBind.Type == binds.Unbind {
+				return m, msgs.SendMessageMsg("can't unbind an unbind")
+			}
+
+			err := selectedBind.Unbind()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Comment):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			err := selectedBind.Comment()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Details):
 			return m, nil
@@ -184,4 +212,24 @@ func (m *Table) setTableHeight() {
 	fixedWindow := consts.WindowSize.Height - consts.DefaultPadding - 3
 
 	m.table.SetHeight(fixedWindow)
+}
+
+func (m *Table) getSelectedBind() *binds.Bind {
+	if len(m.binds) <= 0 {
+		return nil
+	}
+
+	selectedBind := m.binds[m.table.Cursor()]
+
+	return selectedBind
+}
+
+func bindsToRows(binds []*binds.Bind) []table.Row {
+	rows := []table.Row{}
+
+	for _, bind := range binds {
+		rows = append(rows, bind.KeybindToRow())
+	}
+
+	return rows
 }

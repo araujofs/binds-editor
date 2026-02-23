@@ -13,7 +13,6 @@ type BindType int
 const (
 	Normal BindType = iota + 1
 	Unbind
-	Comment
 )
 
 var ModKeys = []string{
@@ -73,7 +72,41 @@ type Bind struct {
 	BindCore
 	LineNumber int
 	RawLine    string
+	Commented  bool
 	FilePath   string
+}
+
+func (b Bind) Comment() error {
+	newBind := b
+	newBind.Commented = !b.Commented
+
+	err := b.ReplaceInFile(newBind)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b Bind) Unbind() error {
+	file, err := os.OpenFile(b.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	b.Type = Unbind
+
+	newUnbind, err := b.KeybindToLine()
+	if err != nil {
+		return err
+	}
+
+	_, err = file.WriteString("\n" + *newUnbind)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b Bind) AppendToFile() error {
@@ -107,35 +140,21 @@ func (b Bind) AppendToFile() error {
 }
 
 func (b Bind) ReplaceInFile(newBind Bind) error {
-	// ler o arquivo
-	content, err := os.ReadFile(b.FilePath)
-	if err != nil && err != io.EOF {
+	lines, err := ReadBindsFileContent(b.FilePath)
+	if err != nil {
 		return err
 	}
 
-	// separar por linhas
-	lines := strings.Split(string(content), "\n")
-
-	// transformar bind em linha
 	newBindLine, err := newBind.KeybindToLine()
 	if err != nil {
 		return err
 	}
 
-	// substituir linha antiga por nova linha
 	lines[b.LineNumber] = *newBindLine
 
-	// transformar linhas em bytes
-	content = []byte(strings.Join(lines, "\n"))
+	content := []byte(strings.Join(lines, "\n"))
 
-	// sobrescrever arquivo
-	file, err := os.Create(b.FilePath)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.Write(content)
-	if err != nil {
+	if err := OverwriteBinsdFile(b.FilePath, content); err != nil {
 		return err
 	}
 
@@ -158,8 +177,9 @@ func (b Bind) KeybindToRow() []string {
 
 	case Unbind:
 		bindTypeString = "Unbind"
+	}
 
-	case Comment:
+	if b.Commented {
 		bindTypeString = "Commented"
 	}
 
@@ -186,11 +206,13 @@ func (b Bind) KeybindToLine() (*string, error) {
 	var bindDefinition strings.Builder
 	var bindContent strings.Builder
 
+	if b.Commented {
+		bindDefinition.WriteString("# ")
+	}
+
 	switch b.Type {
 	case Normal:
 		bindDefinition.WriteString("bind")
-	case Comment:
-		bindDefinition.WriteString("# bind")
 	case Unbind:
 		bindDefinition.WriteString("unbind")
 	}
@@ -224,6 +246,25 @@ func (b Bind) KeybindToLine() (*string, error) {
 func (b Bind) isBindValid() (bool, error) {
 	missingProperties := []string{}
 
+	if b.Shortcut.Key == "" {
+		missingProperties = append(missingProperties, "key")
+	}
+
+	if modKeys := b.Shortcut.ModKeys; len(modKeys) == 0 {
+		missingProperties = append(missingProperties, "mod keys")
+	}
+
+	if b.Type == Unbind {
+		if len(missingProperties) != 0 {
+			missing := strings.Join(missingProperties, ", ")
+			errorMsg := fmt.Errorf("invalid bind, missing: %s", missing)
+
+			return false, errorMsg
+		}
+
+		return true, nil
+	}
+
 	if b.Dispatcher == "" {
 		missingProperties = append(missingProperties, "dispatcher")
 	}
@@ -236,15 +277,7 @@ func (b Bind) isBindValid() (bool, error) {
 		missingProperties = append(missingProperties, "type")
 	}
 
-	if b.Shortcut.Key == "" {
-		missingProperties = append(missingProperties, "key")
-	}
-
-	if modKeys := b.Shortcut.ModKeys; modKeys == nil || len(modKeys) == 0 {
-		missingProperties = append(missingProperties, "mod keys")
-	}
-
-	if flags := b.Flags; flags != nil && len(flags) > 0 && slices.Contains(flags, DefaultFlags["d"]) && b.Description == "" {
+	if flags := b.Flags; len(flags) > 0 && slices.Contains(flags, DefaultFlags["d"]) && b.Description == "" {
 		missingProperties = append(missingProperties, "description")
 	}
 
@@ -260,4 +293,31 @@ func (b Bind) isBindValid() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func ReadBindsFileContent(path string) ([]string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	// separar por linhas
+	lines := strings.Split(string(content), "\n")
+
+	return lines, nil
+}
+
+func OverwriteBinsdFile(path string, content []byte) error {
+	// sobrescrever arquivo
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(content)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

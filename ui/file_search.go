@@ -83,7 +83,7 @@ func (m FileSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filePicker, cmd = m.filePicker.Update(msg)
 
 			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
-				if _, err := binds.ReadBindsFile(path); err != nil {
+				if _, err := binds.ParseBindsFile(path); err != nil {
 					return m, msgs.SendErrorMsg(err.Error())
 				}
 

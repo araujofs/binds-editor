@@ -29,6 +29,8 @@ type MessageMsg struct {
 
 type CleanInfoMsg struct{}
 
+type UpdateTableBindsMsg struct{}
+
 func (model *InfoModel) GetStyledMessage() string {
 	message := ""
 	if model.Message != nil {
@@ -60,5 +62,11 @@ func NewMessageMsg(message string) MessageMsg {
 func SendMessageMsg(message string) tea.Cmd {
 	return func() tea.Msg {
 		return NewMessageMsg(message)
+	}
+}
+
+func SendUpdateTableBindsMsg() tea.Cmd {
+	return func() tea.Msg {
+		return UpdateTableBindsMsg{}
 	}
 }

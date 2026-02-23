@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func ReadBindsFile(path string) ([]*Bind, error) {
+func ParseBindsFile(path string) ([]*Bind, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -42,17 +42,18 @@ func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
 		return nil, nil
 	}
 
-	rawLine = strings.Trim(rawLine, " ")
+	rawLine = strings.TrimSpace(rawLine)
 
 	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
-	commented := false
-
-	if strings.HasPrefix(rawLine, "#") {
-		commented = true
-		rawLine = strings.TrimPrefix(rawLine, "#")
-	}
+	commented := strings.HasPrefix(rawLine, "#")
+	rawLine = strings.TrimPrefix(rawLine, "#")
 
 	bindDefinition, bindContent, found := strings.Cut(rawLine, "=")
+
+	if !commented && !(strings.Contains(bindDefinition, "bind")) {
+		return nil, errorMsg
+	}
+
 	if !found && !commented {
 		return nil, errorMsg
 	}
@@ -61,12 +62,8 @@ func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
 		return nil, nil
 	}
 
-	if !commented && !(strings.Contains(bindDefinition, "bind")) {
-		return nil, errorMsg
-	}
-
-	bindDefinition = strings.TrimSpace(bindDefinition)
 	bindContent = strings.TrimSpace(bindContent)
+	bindDefinition = strings.TrimSpace(bindDefinition)
 	bindFlags := []*Flag{}
 	bindDefinitionLen := len(bindDefinition)
 	bind := Bind{
@@ -77,6 +74,7 @@ func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
 		LineNumber: bindLineNumber,
 		RawLine:    rawLine,
 		FilePath:   path,
+		Commented:  commented,
 	}
 
 	if strings.HasPrefix(bindDefinition, "un") {
@@ -103,20 +101,6 @@ func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
 				bindFlags = append(bindFlags, flag)
 			}
 		}
-	}
-
-	if commented {
-		bindCore, err := parseBindContent(bindContent)
-
-		if err != nil {
-			return nil, nil
-		}
-
-		bind.BindCore = *bindCore
-		bind.Type = Comment
-		bind.Flags = bindFlags
-
-		return &bind, nil
 	}
 
 	bindCore, err := parseBindContent(bindContent)
