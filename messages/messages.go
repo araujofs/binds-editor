@@ -27,10 +27,14 @@ type MessageMsg struct {
 	Message string
 }
 
+type CleanInfoMsg struct{}
+
+type UpdateTableBindsMsg struct{}
+
 func (model *InfoModel) GetStyledMessage() string {
 	message := ""
 	if model.Message != nil {
-		message = " |" + consts.MessageStyle.Render(fmt.Sprintf(" (%s)", *model.Message))
+		message = " >" + consts.MessageStyle.Render(fmt.Sprintf(" (%s)", *model.Message))
 	}
 
 	if model.Error != nil {
@@ -57,6 +61,12 @@ func NewMessageMsg(message string) MessageMsg {
 
 func SendMessageMsg(message string) tea.Cmd {
 	return func() tea.Msg {
-		return NewErrorMsg(message)
+		return NewMessageMsg(message)
+	}
+}
+
+func SendUpdateTableBindsMsg() tea.Cmd {
+	return func() tea.Msg {
+		return UpdateTableBindsMsg{}
 	}
 }

@@ -23,7 +23,7 @@ const (
 )
 
 type FileSelection struct {
-	config           *config.Configuration
+	*consts.GlobalState
 	list             list.Model
 	input            textinput.Model
 	help             help.Model
@@ -33,9 +33,11 @@ type FileSelection struct {
 	msgs.InfoModel
 }
 
-func InitFileSelection(path *string, configuration *config.Configuration) *FileSelection {
-	if configuration == nil {
-		configuration = config.GetConfigData()
+func InitFileSelection(path *string, globalState *consts.GlobalState) *FileSelection {
+	if globalState == nil {
+		globalState = &consts.GlobalState{
+			Configuration: config.GetConfigData(),
+		}
 	}
 
 	fileList := list.New([]list.Item{}, list.NewDefaultDelegate(), 8, 8)
@@ -50,7 +52,7 @@ func InitFileSelection(path *string, configuration *config.Configuration) *FileS
 	input.Width = 20
 
 	model := &FileSelection{
-		config:           configuration,
+		GlobalState:      globalState,
 		list:             fileList,
 		input:            input,
 		help:             help.New(),
@@ -99,7 +101,7 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Error = nil
 
 		if msg.String() == "ctrl+c" {
-			m.config.SaveConfiguration()
+			m.GlobalState.Configuration.SaveConfiguration()
 			return m, tea.Quit
 		}
 
@@ -125,7 +127,7 @@ func (m FileSelection) View() string {
 }
 
 func (m *FileSelection) filesToItems() []list.Item {
-	files := m.config.Files
+	files := m.GlobalState.Configuration.Files
 
 	if len(files) == 0 {
 		return make([]list.Item, 0)
@@ -168,11 +170,11 @@ func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 
 		var err error
 		if m.mode == adding {
-			err = m.config.AddFile(m.selectedFilePath, configFileName)
+			err = m.GlobalState.Configuration.AddFile(m.selectedFilePath, configFileName)
 		}
 
 		if m.mode == editing {
-			err = m.config.EditFile(m.selectedFileName, configFileName)
+			err = m.GlobalState.Configuration.EditFile(m.selectedFileName, configFileName)
 		}
 
 		if err != nil {
@@ -219,27 +221,29 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
+		selectedFileIdx := config.SearchSlice(m.GlobalState.Configuration.Files, "Name", selectedItem.FilterValue())
 		if selectedFileIdx == -1 {
 			return m, msgs.SendErrorMsg("selected file doesn't exist in your configuration")
 		}
 
-		selectedFile := m.config.Files[selectedFileIdx]
+		selectedFile := m.GlobalState.Configuration.Files[selectedFileIdx]
 		if selectedFile == nil {
 			return m, nil
 		}
 
-		return InitTable(selectedFile, m.config)
+		m.GlobalState.SelectedFile = selectedFile
+
+		return InitTable(m.GlobalState)
 
 	case key.Matches(msg, keys.FileSelectionKeys.Save):
-		err := m.config.SaveConfiguration()
+		err := m.GlobalState.Configuration.SaveConfiguration()
 		if err != nil {
 			cmd = msgs.SendErrorMsg(err.Error())
 		}
 		return m, cmd
 
 	case key.Matches(msg, keys.FileSelectionKeys.Add):
-		return InitFileSearch(m.config)
+		return InitFileSearch(m.GlobalState)
 
 	case key.Matches(msg, keys.FileSelectionKeys.Delete):
 		selectedItem := m.list.SelectedItem()
@@ -247,7 +251,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		err := m.config.RemoveFile(m.list.SelectedItem().FilterValue())
+		err := m.GlobalState.Configuration.RemoveFile(m.list.SelectedItem().FilterValue())
 		if err != nil {
 			cmd = msgs.SendErrorMsg(err.Error())
 			return m, cmd
@@ -263,12 +267,12 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		selectedFileIdx := config.SearchSlice(m.config.Files, "Name", selectedItem.FilterValue())
+		selectedFileIdx := config.SearchSlice(m.GlobalState.Configuration.Files, "Name", selectedItem.FilterValue())
 		if selectedFileIdx == -1 {
 			return m, msgs.SendErrorMsg("selected file doesn't exist in your configuration")
 		}
 
-		selectedFile := m.config.Files[selectedFileIdx]
+		selectedFile := m.GlobalState.Configuration.Files[selectedFileIdx]
 		if selectedFile == nil {
 			return m, nil
 		}

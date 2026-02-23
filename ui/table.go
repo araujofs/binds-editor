@@ -1,9 +1,8 @@
 package ui
 
 import (
-	config "github.com/araujofs/binds-editor/configuration"
+	"github.com/araujofs/binds-editor/binds"
 	consts "github.com/araujofs/binds-editor/constants"
-	"github.com/araujofs/binds-editor/files"
 	keys "github.com/araujofs/binds-editor/help"
 	msgs "github.com/araujofs/binds-editor/messages"
 
@@ -23,19 +22,18 @@ var (
 )
 
 type Table struct {
-	binds  []*files.Bind
+	binds  []*binds.Bind
 	cursor int
 	table  table.Model
 	help   help.Model
-	config *config.Configuration
+	*consts.GlobalState
 	msgs.InfoModel
 }
 
-func InitTable(selectedFile *config.File, configuration *config.Configuration) (tea.Model, tea.Cmd) {
-	binds, err := files.ReadBindsFile(selectedFile.Path)
-
+func InitTable(globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
+	binds, err := binds.ParseBindsFile(globalState.SelectedFile.Path)
 	if err != nil {
-		return InitFileSelection(nil, configuration), msgs.SendErrorMsg(err.Error())
+		return InitFileSelection(nil, globalState), msgs.SendErrorMsg(err.Error())
 	}
 
 	columns := []table.Column{
@@ -46,15 +44,9 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 		{Title: "Flags", Width: 20},
 	}
 
-	rows := []table.Row{}
-
-	for _, bind := range binds {
-		rows = append(rows, bind.KeybindToRow())
-	}
-
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
+		table.WithRows(bindsToRows(binds)),
 		table.WithFocused(true),
 		table.WithKeyMap(table.DefaultKeyMap()),
 	)
@@ -79,12 +71,12 @@ func InitTable(selectedFile *config.File, configuration *config.Configuration) (
 	t.SetStyles(s)
 
 	model := &Table{
-		binds:     binds,
-		cursor:    0,
-		table:     t,
-		help:      help.New(),
-		config:    configuration,
-		InfoModel: msgs.GetDefaultInfoModel(),
+		binds:       binds,
+		cursor:      0,
+		table:       t,
+		help:        help.New(),
+		GlobalState: globalState,
+		InfoModel:   msgs.GetDefaultInfoModel(),
 	}
 
 	model.setTableHeight()
@@ -100,6 +92,17 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case msgs.UpdateTableBindsMsg:
+		binds, err := binds.ParseBindsFile(m.GlobalState.SelectedFile.Path)
+		if err != nil {
+			return InitFileSelection(nil, m.GlobalState), msgs.SendErrorMsg(err.Error())
+		}
+
+		m.binds = binds
+		m.table.SetRows(bindsToRows(m.binds))
+
+		return m, nil
+
 	case msgs.ErrorMsg:
 		m.Message = nil
 		m.Error = &msg.Message
@@ -121,35 +124,70 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case key.Matches(msg, keys.TableKeys.Up):
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			break
 
 		case key.Matches(msg, keys.TableKeys.Down):
-			if m.cursor < len(m.binds)-1 {
-				m.cursor++
-			}
+			break
 
 		case key.Matches(msg, keys.TableKeys.Create):
-			return m, nil
+			return InitCreate(m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Edit):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			return InitEdit(selectedBind, m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Delete):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			err := selectedBind.Delete()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Unbind):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			if selectedBind.Type == binds.Unbind {
+				return m, msgs.SendMessageMsg("can't unbind an unbind")
+			}
+
+			err := selectedBind.Unbind()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Comment):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			err := selectedBind.Comment()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Details):
 			return m, nil
 
 		case key.Matches(msg, keys.TableKeys.GoBack):
-			return InitFileSelection(nil, m.config), nil
+			return InitFileSelection(nil, m.GlobalState), nil
 
 		}
 
@@ -184,4 +222,24 @@ func (m *Table) setTableHeight() {
 	fixedWindow := consts.WindowSize.Height - consts.DefaultPadding - 3
 
 	m.table.SetHeight(fixedWindow)
+}
+
+func (m *Table) getSelectedBind() *binds.Bind {
+	if len(m.binds) <= 0 {
+		return nil
+	}
+
+	selectedBind := m.binds[m.table.Cursor()]
+
+	return selectedBind
+}
+
+func bindsToRows(binds []*binds.Bind) []table.Row {
+	rows := []table.Row{}
+
+	for _, bind := range binds {
+		rows = append(rows, bind.KeybindToRow())
+	}
+
+	return rows
 }
