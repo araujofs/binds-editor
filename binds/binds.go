@@ -76,6 +76,23 @@ type Bind struct {
 	FilePath   string
 }
 
+func (b Bind) Delete() error {
+	lines, err := ReadBindsFileContent(b.FilePath)
+	if err != nil {
+		return err
+	}
+
+	lines = slices.Delete(lines, b.LineNumber, b.LineNumber+1)
+
+	content := []byte(strings.Join(lines, "\n"))
+
+	if err := OverwriteBinsdFile(b.FilePath, content); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b Bind) Comment() error {
 	newBind := b
 	newBind.Commented = !b.Commented

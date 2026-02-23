@@ -141,7 +141,17 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return InitEdit(selectedBind, m.GlobalState)
 
 		case key.Matches(msg, keys.TableKeys.Delete):
-			return m, nil
+			selectedBind := m.getSelectedBind()
+			if selectedBind == nil {
+				return m, nil
+			}
+
+			err := selectedBind.Delete()
+			if err != nil {
+				return m, msgs.SendErrorMsg(err.Error())
+			}
+
+			return m, msgs.SendUpdateTableBindsMsg()
 
 		case key.Matches(msg, keys.TableKeys.Unbind):
 			selectedBind := m.getSelectedBind()
