@@ -148,7 +148,7 @@ func (e *Edit) createForm() {
 			huh.NewInput().Title("Action").Value(&e.newBind.Action),
 		),
 		huh.NewGroup(
-			huh.NewInput().Title("Description").Value(&e.originalBind.Description),
+			huh.NewInput().Title("Description").Value(&e.newBind.Description),
 		).WithHideFunc(
 			func() bool {
 				return !slices.Contains(e.newBind.Flags, binds.DefaultFlags["d"])
