@@ -11,8 +11,10 @@ import (
 )
 
 type File struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Readonly bool   `json:"readonly"`
+	Output   string `json:"output"`
 }
 
 func (f File) FilterValue() string {
@@ -29,6 +31,23 @@ func (f File) Title() string {
 
 type Configuration struct {
 	Files []*File `json:"files"`
+}
+
+func CreateFile(name, path string, output *string, readonly *bool) *File {
+	file := &File{
+		Name: name,
+		Path: path,
+	}
+
+	if output != nil {
+		file.Output = *output
+	}
+
+	if readonly != nil {
+		file.Readonly = *readonly
+	}
+
+	return file
 }
 
 // SearchSlice tries to find a *File inside a []*File slice
@@ -60,18 +79,18 @@ func (c *Configuration) fileExists(path *string, name *string) (int, int) {
 	return -1, -1
 }
 
-func (c *Configuration) AddFile(path string, name string) error {
-	_, exists := c.fileExists(&path, &name)
+func (c *Configuration) AddFile(newFile *File) error {
+	_, exists := c.fileExists(&newFile.Path, &newFile.Name)
 
 	if exists == 1 {
-		return fmt.Errorf(`bindings file already exists with name "%s"`, name)
+		return fmt.Errorf(`bindings file already exists with name "%s"`, newFile.Name)
 	}
 
 	if exists == 2 {
-		return fmt.Errorf(`bindings file already exists with path "%s"`, path)
+		return fmt.Errorf(`bindings file already exists with path "%s"`, newFile.Path)
 	}
 
-	c.Files = append(c.Files, &File{Name: name, Path: path})
+	c.Files = append(c.Files, newFile)
 
 	return nil
 }
@@ -88,14 +107,19 @@ func (c *Configuration) RemoveFile(name string) error {
 	return nil
 }
 
-func (c *Configuration) EditFile(oldName string, newName string) error {
-	idx, exists := c.fileExists(nil, &oldName)
+func (c *Configuration) EditFile(oldFileName string, newFile File) error {
+	idx, exists := c.fileExists(nil, &oldFileName)
 
 	if exists == -1 {
-		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldName)
+		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldFileName)
 	}
 
-	c.Files[idx].Name = newName
+	file := c.Files[idx]
+
+	file.Name = newFile.Name
+	file.Path = newFile.Path
+	file.Readonly = newFile.Readonly
+	file.Output = newFile.Output
 
 	return nil
 }
