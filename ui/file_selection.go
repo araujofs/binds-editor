@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"strings"
-
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
 	keys "github.com/araujofs/binds-editor/help"
@@ -10,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -24,12 +21,9 @@ const (
 
 type FileSelection struct {
 	*consts.GlobalState
-	list             list.Model
-	input            textinput.Model
-	help             help.Model
-	mode             mode
-	selectedFilePath string
-	selectedFileName string
+	list list.Model
+	help help.Model
+	mode mode
 	msgs.InfoModel
 }
 
@@ -46,31 +40,16 @@ func InitFileSelection(path *string, globalState *consts.GlobalState) *FileSelec
 	fileList.SetShowFilter(false)
 	fileList.SetFilteringEnabled(false)
 
-	input := textinput.New()
-	input.Placeholder = "General config"
-	input.CharLimit = 50
-	input.Width = 20
-
 	model := &FileSelection{
-		GlobalState:      globalState,
-		list:             fileList,
-		input:            input,
-		help:             help.New(),
-		mode:             navigating,
-		selectedFilePath: "",
-		selectedFileName: "",
-		InfoModel:        msgs.GetDefaultInfoModel(),
+		GlobalState: globalState,
+		list:        fileList,
+		help:        help.New(),
+		mode:        navigating,
+		InfoModel:   msgs.GetDefaultInfoModel(),
 	}
 
 	items := model.filesToItems()
 	model.list.SetItems(items)
-
-	if path != nil {
-		model.selectedFilePath = *path
-		model.input.Focus()
-		model.mode = adding
-		model.setListSize()
-	}
 
 	if consts.WindowSize.Height != 0 {
 		model.setListSize()
@@ -96,6 +75,7 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
 		m.setListSize()
+
 	case tea.KeyMsg:
 		m.Message = nil
 		m.Error = nil
@@ -103,10 +83,6 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.GlobalState.Configuration.SaveConfiguration()
 			return m, tea.Quit
-		}
-
-		if m.input.Focused() && m.mode != navigating {
-			return updateInput(msg, &m)
 		}
 
 		return updateList(msg, &m)
@@ -118,10 +94,6 @@ func (m FileSelection) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m FileSelection) View() string {
 	title := "Binds Editor | Select File"
 	title += m.GetStyledMessage()
-
-	if m.input.Focused() {
-		return consts.FullScreenStyle.Render(title + m.list.View() + "\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()) + "\n" + m.input.View())
-	}
 
 	return consts.FullScreenStyle.Render(title + m.list.View() + "\n\n" + m.help.FullHelpView(keys.FileSelectionKeys.FullHelp()))
 }
@@ -146,62 +118,7 @@ func (m *FileSelection) setListSize() {
 	top, right, bottom, left := consts.FullScreenStyle.GetMargin()
 	msg := consts.WindowSize
 
-	if m.input.Focused() {
-		m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-6)
-		return
-	}
-
 	m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-6)
-}
-
-func updateInput(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch {
-	case key.Matches(msg, keys.FileSelectionInputKeys.Enter):
-		configFileName := m.input.Value()
-		m.input.SetValue("")
-		m.input.Blur()
-		m.setListSize()
-
-		if strings.Trim(configFileName, " ") == "" {
-			m.mode = navigating
-		}
-
-		var err error
-		if m.mode == adding {
-			err = m.GlobalState.Configuration.AddFile(m.selectedFilePath, configFileName)
-		}
-
-		if m.mode == editing {
-			err = m.GlobalState.Configuration.EditFile(m.selectedFileName, configFileName)
-		}
-
-		if err != nil {
-			cmd = msgs.SendErrorMsg(err.Error())
-		}
-
-		m.selectedFileName = ""
-		m.selectedFilePath = ""
-		m.mode = navigating
-		m.list.SetItems(m.filesToItems())
-
-		return m, cmd
-
-	case key.Matches(msg, keys.FileSelectionInputKeys.Back):
-		m.input.SetValue("")
-		m.input.Blur()
-
-		m.selectedFileName = ""
-		m.selectedFilePath = ""
-
-		m.mode = navigating
-		return m, nil
-	}
-
-	m.input, cmd = m.input.Update(msg)
-
-	return m, cmd
 }
 
 func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
@@ -277,13 +194,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.input.Focus()
-		m.input.SetValue(selectedFile.Name)
-		m.selectedFileName = selectedFile.Name
-		m.mode = editing
-		m.setListSize()
-
-		return m, nil
+		return InitFileEdit(selectedFile, m.GlobalState)
 
 	case key.Matches(msg, keys.FileSelectionKeys.Help):
 		return m, nil
