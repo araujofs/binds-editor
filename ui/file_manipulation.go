@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	config "github.com/araujofs/binds-editor/configuration"
 	consts "github.com/araujofs/binds-editor/constants"
@@ -12,21 +13,36 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-type FileEdit struct {
+type Mode int
+
+const (
+	create Mode = iota
+	edit
+)
+
+type FileManipulation struct {
 	form         *huh.Form
 	originalFile *config.File
 	newFile      *config.File
+	mode         Mode
 	formKeys     *huh.KeyMap
 	*consts.GlobalState
 	msgs.InfoModel
 }
 
-func InitFileEdit(originalFile *config.File, globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
-	newFile := *originalFile
+func InitFileManipulation(originalFile *config.File, globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
+	var mode Mode
 
-	model := &FileEdit{
+	var newFile config.File
+	if originalFile != nil {
+		newFile = *originalFile
+		mode = edit
+	}
+
+	model := &FileManipulation{
 		originalFile: originalFile,
 		newFile:      &newFile,
+		mode:         mode,
 		formKeys:     huh.NewDefaultKeyMap(),
 		GlobalState:  globalState,
 	}
@@ -36,11 +52,11 @@ func InitFileEdit(originalFile *config.File, globalState *consts.GlobalState) (t
 	return model, model.form.Init()
 }
 
-func (m FileEdit) Init() tea.Cmd {
+func (m FileManipulation) Init() tea.Cmd {
 	return nil
 }
 
-func (m FileEdit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m FileManipulation) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		consts.WindowSize = msg
@@ -76,30 +92,41 @@ func (m FileEdit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	if m.form.State == huh.StateCompleted {
+	if m.form.State != huh.StateCompleted {
+		return m, tea.Batch(cmds...)
+	}
+
+	model := InitFileSelection(m.GlobalState)
+
+	if m.mode == edit {
 		err := m.Configuration.EditFile(m.originalFile.Name, *m.newFile)
 		if err != nil {
 			cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
-			return m, tea.Batch(cmds...)
+			return model, tea.Batch(cmds...)
 		}
 
-		model := InitFileSelection(nil, m.GlobalState)
 		cmds = append(cmds, msgs.SendMessageMsg(fmt.Sprintf("file \"%s\" edited", m.originalFile.Name)))
-
 		return model, tea.Batch(cmds...)
 	}
 
-	return m, tea.Batch(cmds...)
+	err := m.Configuration.AddFile(m.newFile)
+	if err != nil {
+		cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
+		return model, tea.Batch(cmds...)
+	}
+
+	cmds = append(cmds, msgs.SendMessageMsg(fmt.Sprintf("file \"%s\" created", m.newFile.Name)))
+	return model, tea.Batch(cmds...)
 }
 
-func (m FileEdit) View() string {
+func (m FileManipulation) View() string {
 	title := "Binds Editor | Edit Configuration File"
 	title += m.GetStyledMessage()
 
 	return consts.FullScreenStyle.Render(title + m.form.View())
 }
 
-func (fe *FileEdit) createForm() {
+func (fe *FileManipulation) createForm() {
 	top, _, bottom, _ := consts.FullScreenStyle.GetMargin()
 
 	dir := "."
@@ -111,15 +138,23 @@ func (fe *FileEdit) createForm() {
 	fe.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Title("File name").Value(&fe.newFile.Name).CharLimit(30),
-			huh.NewFilePicker().Title("File path").Value(&fe.newFile.Path).Description("Change the path of the configuration file").AllowedTypes([]string{".conf"}).CurrentDirectory(dir).ShowHidden(true),
+			huh.NewFilePicker().Validate(isPathEmpty).Title("File path").Value(&fe.newFile.Path).Description("Change the path of the configuration file").AllowedTypes([]string{".conf"}).CurrentDirectory(dir).ShowHidden(true),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().Title("The file should be readonly?").Affirmative("Yes!").Negative("No!").Value(&fe.newFile.Readonly),
 		),
 		huh.NewGroup(
-			huh.NewFilePicker().Title("File output").Value(&fe.newFile.Output).Description("Change the path of the output file").AllowedTypes([]string{".conf"}).CurrentDirectory(dir).ShowHidden(true),
+			huh.NewFilePicker().Validate(isPathEmpty).Title("File output").Value(&fe.newFile.Output).Description("Change the path of the output file").AllowedTypes([]string{".conf"}).CurrentDirectory(dir).ShowHidden(true),
 		).WithHideFunc(func() bool {
 			return !fe.newFile.Readonly
 		}),
 	).WithHeight(consts.WindowSize.Height - top - bottom - 3)
+}
+
+func isPathEmpty(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("path can't be empty")
+	}
+
+	return nil
 }

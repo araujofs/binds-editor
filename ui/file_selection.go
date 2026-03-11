@@ -11,23 +11,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type mode int
-
-const (
-	navigating mode = iota + 1
-	adding
-	editing
-)
-
 type FileSelection struct {
 	*consts.GlobalState
 	list list.Model
 	help help.Model
-	mode mode
 	msgs.InfoModel
 }
 
-func InitFileSelection(path *string, globalState *consts.GlobalState) *FileSelection {
+func InitFileSelection(globalState *consts.GlobalState) *FileSelection {
 	if globalState == nil {
 		globalState = &consts.GlobalState{
 			Configuration: config.GetConfigData(),
@@ -44,7 +35,6 @@ func InitFileSelection(path *string, globalState *consts.GlobalState) *FileSelec
 		GlobalState: globalState,
 		list:        fileList,
 		help:        help.New(),
-		mode:        navigating,
 		InfoModel:   msgs.GetDefaultInfoModel(),
 	}
 
@@ -160,7 +150,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case key.Matches(msg, keys.FileSelectionKeys.Add):
-		return InitFileSearch(m.GlobalState)
+		return InitFileManipulation(nil, m.GlobalState)
 
 	case key.Matches(msg, keys.FileSelectionKeys.Delete):
 		selectedItem := m.list.SelectedItem()
@@ -194,7 +184,7 @@ func updateList(msg tea.KeyMsg, m *FileSelection) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		return InitFileEdit(selectedFile, m.GlobalState)
+		return InitFileManipulation(selectedFile, m.GlobalState)
 
 	case key.Matches(msg, keys.FileSelectionKeys.Help):
 		return m, nil

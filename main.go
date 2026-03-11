@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	m := ui.InitFileSelection(nil, nil)
+	m := ui.InitFileSelection(nil)
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Printf("there's been an error: %v", err)

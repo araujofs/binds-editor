@@ -33,7 +33,7 @@ type Table struct {
 func InitTable(globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
 	binds, err := binds.ParseBindsFile(globalState.SelectedFile.Path)
 	if err != nil {
-		return InitFileSelection(nil, globalState), msgs.SendErrorMsg(err.Error())
+		return InitFileSelection(globalState), msgs.SendErrorMsg(err.Error())
 	}
 
 	columns := []table.Column{
@@ -95,7 +95,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msgs.UpdateTableBindsMsg:
 		binds, err := binds.ParseBindsFile(m.GlobalState.SelectedFile.Path)
 		if err != nil {
-			return InitFileSelection(nil, m.GlobalState), msgs.SendErrorMsg(err.Error())
+			return InitFileSelection(m.GlobalState), msgs.SendErrorMsg(err.Error())
 		}
 
 		m.binds = binds
@@ -187,7 +187,7 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.TableKeys.GoBack):
-			return InitFileSelection(nil, m.GlobalState), nil
+			return InitFileSelection(m.GlobalState), nil
 
 		}
 
