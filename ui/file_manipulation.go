@@ -13,10 +13,10 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-type Mode int
+type mode int
 
 const (
-	create Mode = iota
+	create mode = iota
 	edit
 )
 
@@ -24,14 +24,14 @@ type FileManipulation struct {
 	form         *huh.Form
 	originalFile *config.File
 	newFile      *config.File
-	mode         Mode
+	mode         mode
 	formKeys     *huh.KeyMap
 	*consts.GlobalState
 	msgs.InfoModel
 }
 
 func InitFileManipulation(originalFile *config.File, globalState *consts.GlobalState) (tea.Model, tea.Cmd) {
-	var mode Mode
+	var mode mode
 
 	var newFile config.File
 	if originalFile != nil {
@@ -96,27 +96,25 @@ func (m FileManipulation) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 
-	model := InitFileSelection(m.GlobalState)
-
 	if m.mode == edit {
 		err := m.Configuration.EditFile(m.originalFile.Name, *m.newFile)
 		if err != nil {
 			cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
-			return model, tea.Batch(cmds...)
+			return InitFileSelection(m.GlobalState), tea.Batch(cmds...)
 		}
 
 		cmds = append(cmds, msgs.SendMessageMsg(fmt.Sprintf("file \"%s\" edited", m.originalFile.Name)))
-		return model, tea.Batch(cmds...)
+		return InitFileSelection(m.GlobalState), tea.Batch(cmds...)
 	}
 
 	err := m.Configuration.AddFile(m.newFile)
 	if err != nil {
 		cmds = append(cmds, msgs.SendErrorMsg(err.Error()))
-		return model, tea.Batch(cmds...)
+		return InitFileSelection(m.GlobalState), tea.Batch(cmds...)
 	}
 
 	cmds = append(cmds, msgs.SendMessageMsg(fmt.Sprintf("file \"%s\" created", m.newFile.Name)))
-	return model, tea.Batch(cmds...)
+	return InitFileSelection(m.GlobalState), tea.Batch(cmds...)
 }
 
 func (m FileManipulation) View() string {
