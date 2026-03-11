@@ -89,8 +89,6 @@ func (m Table) Init() tea.Cmd {
 }
 
 func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case msgs.UpdateTableBindsMsg:
 		binds, err := binds.ParseBindsFile(m.GlobalState.SelectedFile.Path)
@@ -119,82 +117,10 @@ func (m Table) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Message = nil
 		m.Error = nil
 
-		switch {
-		case key.Matches(msg, keys.TableKeys.Close):
-			return m, tea.Quit
-
-		case key.Matches(msg, keys.TableKeys.Up):
-			break
-
-		case key.Matches(msg, keys.TableKeys.Down):
-			break
-
-		case key.Matches(msg, keys.TableKeys.Create):
-			return InitCreate(m.GlobalState)
-
-		case key.Matches(msg, keys.TableKeys.Edit):
-			selectedBind := m.getSelectedBind()
-			if selectedBind == nil {
-				return m, nil
-			}
-
-			return InitEdit(selectedBind, m.GlobalState)
-
-		case key.Matches(msg, keys.TableKeys.Delete):
-			selectedBind := m.getSelectedBind()
-			if selectedBind == nil {
-				return m, nil
-			}
-
-			err := selectedBind.Delete()
-			if err != nil {
-				return m, msgs.SendErrorMsg(err.Error())
-			}
-
-			return m, msgs.SendUpdateTableBindsMsg()
-
-		case key.Matches(msg, keys.TableKeys.Unbind):
-			selectedBind := m.getSelectedBind()
-			if selectedBind == nil {
-				return m, nil
-			}
-
-			if selectedBind.Type == binds.Unbind {
-				return m, msgs.SendMessageMsg("can't unbind an unbind")
-			}
-
-			err := selectedBind.Unbind()
-			if err != nil {
-				return m, msgs.SendErrorMsg(err.Error())
-			}
-
-			return m, msgs.SendUpdateTableBindsMsg()
-
-		case key.Matches(msg, keys.TableKeys.Comment):
-			selectedBind := m.getSelectedBind()
-			if selectedBind == nil {
-				return m, nil
-			}
-
-			err := selectedBind.Comment()
-			if err != nil {
-				return m, msgs.SendErrorMsg(err.Error())
-			}
-
-			return m, msgs.SendUpdateTableBindsMsg()
-
-		case key.Matches(msg, keys.TableKeys.Details):
-			return m, nil
-
-		case key.Matches(msg, keys.TableKeys.GoBack):
-			return InitFileSelection(m.GlobalState), nil
-
-		}
-
-		m.table, cmd = m.table.Update(msg)
+		return m.handleKeyPress(msg)
 	}
 
-	return m, cmd
+	return m, nil
 }
 
 func (m Table) View() string {
@@ -214,7 +140,14 @@ func (m Table) View() string {
 
 	m.table.SetColumns(columns)
 
-	helpView := "\n" + m.help.FullHelpView(keys.TableKeys.FullHelp())
+	var fullHelp [][]key.Binding
+	if m.GlobalState.SelectedFile.Readonly {
+		fullHelp = keys.ReadonlyTableKeys.FullHelp()
+	} else {
+		fullHelp = keys.TableKeys.FullHelp()
+	}
+
+	helpView := "\n" + m.help.FullHelpView(fullHelp)
 	return paddingStyle.Render(title + m.table.View() + helpView)
 }
 
@@ -242,4 +175,84 @@ func bindsToRows(binds []*binds.Bind) []table.Row {
 	}
 
 	return rows
+}
+
+func (m Table) handleKeyPress(pressedKey tea.KeyMsg) (tea.Model, tea.Cmd) {
+	readonly := m.GlobalState.SelectedFile.Readonly
+
+	switch {
+	case key.Matches(pressedKey, keys.TableKeys.Close):
+		return m, tea.Quit
+
+	case key.Matches(pressedKey, keys.TableKeys.Up):
+		break
+
+	case key.Matches(pressedKey, keys.TableKeys.Down):
+		break
+
+	case key.Matches(pressedKey, keys.TableKeys.Create) && !readonly:
+		return InitCreate(m.GlobalState)
+
+	case key.Matches(pressedKey, keys.TableKeys.Edit) && !readonly:
+		selectedBind := m.getSelectedBind()
+		if selectedBind == nil {
+			return m, nil
+		}
+
+		return InitEdit(selectedBind, m.GlobalState)
+
+	case key.Matches(pressedKey, keys.TableKeys.Delete) && !readonly:
+		selectedBind := m.getSelectedBind()
+		if selectedBind == nil {
+			return m, nil
+		}
+
+		err := selectedBind.Delete()
+		if err != nil {
+			return m, msgs.SendErrorMsg(err.Error())
+		}
+
+		return m, msgs.SendUpdateTableBindsMsg()
+
+	case key.Matches(pressedKey, keys.TableKeys.Unbind):
+		selectedBind := m.getSelectedBind()
+		if selectedBind == nil {
+			return m, nil
+		}
+
+		if selectedBind.Type == binds.Unbind {
+			return m, msgs.SendMessageMsg("can't unbind an unbind")
+		}
+
+		err := selectedBind.Unbind()
+		if err != nil {
+			return m, msgs.SendErrorMsg(err.Error())
+		}
+
+		return m, msgs.SendUpdateTableBindsMsg()
+
+	case key.Matches(pressedKey, keys.TableKeys.Comment) && !readonly:
+		selectedBind := m.getSelectedBind()
+		if selectedBind == nil {
+			return m, nil
+		}
+
+		err := selectedBind.Comment()
+		if err != nil {
+			return m, msgs.SendErrorMsg(err.Error())
+		}
+
+		return m, msgs.SendUpdateTableBindsMsg()
+
+	case key.Matches(pressedKey, keys.TableKeys.Details):
+		return m, nil
+
+	case key.Matches(pressedKey, keys.TableKeys.GoBack):
+		return InitFileSelection(m.GlobalState), nil
+	}
+
+	updatedTable, cmd := m.table.Update(pressedKey)
+	m.table = updatedTable
+
+	return m, cmd
 }
