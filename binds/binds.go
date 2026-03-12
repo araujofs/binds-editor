@@ -126,6 +126,13 @@ func (b Bind) Unbind() error {
 	return nil
 }
 
+func (b Bind) UnbindWithOutput(outputPath string) error {
+	b.FilePath = outputPath
+	b.Unbind()
+
+	return nil
+}
+
 func (b Bind) AppendToFile() error {
 	content, err := os.ReadFile(b.FilePath)
 	if err != nil && err != io.EOF {

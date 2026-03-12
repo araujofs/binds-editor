@@ -214,17 +214,34 @@ func (m Table) handleKeyPress(pressedKey tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		return m, msgs.SendUpdateTableBindsMsg()
 
-	case key.Matches(pressedKey, keys.TableKeys.Unbind):
+	case key.Matches(pressedKey, keys.TableKeys.Unbind) && !readonly:
 		selectedBind := m.getSelectedBind()
 		if selectedBind == nil {
 			return m, nil
 		}
 
-		if selectedBind.Type == binds.Unbind {
-			return m, msgs.SendMessageMsg("can't unbind an unbind")
+		if selectedBind.Type != binds.Normal {
+			return m, msgs.SendMessageMsg("can only unbind a bind")
 		}
 
 		err := selectedBind.Unbind()
+		if err != nil {
+			return m, msgs.SendErrorMsg(err.Error())
+		}
+
+		return m, msgs.SendUpdateTableBindsMsg()
+
+	case key.Matches(pressedKey, keys.TableKeys.Unbind) && readonly:
+		selectedBind := m.getSelectedBind()
+		if selectedBind == nil {
+			return m, nil
+		}
+
+		if selectedBind.Type != binds.Normal {
+			return m, msgs.SendMessageMsg("can only unbind a bind")
+		}
+
+		err := selectedBind.UnbindWithOutput(m.GlobalState.SelectedFile.Output)
 		if err != nil {
 			return m, msgs.SendErrorMsg(err.Error())
 		}
