@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 type File struct {
@@ -22,10 +24,24 @@ func (f File) FilterValue() string {
 }
 
 func (f File) Description() string {
-	return f.Path
+	var description string
+
+	description += f.Path
+
+	if f.Readonly {
+		description += " - " + f.Output
+	}
+
+	return description
 }
 
 func (f File) Title() string {
+	readonly := lipgloss.NewStyle().Foreground(lipgloss.Color("#fb1")).Render(" (Readonly)")
+
+	if f.Readonly {
+		return f.Name + readonly
+	}
+
 	return f.Name
 }
 
