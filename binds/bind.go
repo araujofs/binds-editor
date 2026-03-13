@@ -114,8 +114,8 @@ func (b *Bind) GetLineNumber() int {
 	return b.LineNumber
 }
 
-func (b *Bind) Comment() {
-	b.Commented = true
+func (b *Bind) ToggleComment() {
+	b.Commented = !b.Commented
 }
 
 func (b *Bind) Unbind() error {

@@ -26,6 +26,10 @@ func NewUnbind(shortcut Shortcut, lineNumber int, rawLine string, file *File, co
 	return &unbind, nil
 }
 
+func (u *Unbind) ToggleComment() {
+	u.Commented = !u.Commented
+}
+
 func (u *Unbind) GetLine() string {
 	var bind strings.Builder
 	var bindDefinition strings.Builder
