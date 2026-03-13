@@ -4,121 +4,229 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
+
+	"github.com/araujofs/binds-editor/errors"
 )
 
-func ParseBindsFile(path string) ([]*Bind, error) {
-	f, err := os.Open(path)
+// TODO: pass file to parsing functions
+
+func (fi *File) Parse() ([]Line, error) {
+	f, err := os.Open(fi.Path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	bindings := make([]*Bind, 0, 50)
-
+	lines := make([]Line, 0, 50)
 	scanner := bufio.NewScanner(f)
 
 	lineNumber := 0
 	for scanner.Scan() {
 		line := scanner.Text()
-		bind, err := parseBind(path, line, lineNumber)
+		line = strings.TrimSpace(line)
+
+		newLine, err := parseLine(fi, line, lineNumber)
 		if err != nil {
 			return nil, err
 		}
 
-		if bind != nil {
-			bindings = append(bindings, bind)
-		}
+		lines = append(lines, newLine)
 
 		lineNumber++
 	}
 
-	return bindings, nil
+	return lines, nil
 }
 
-func parseBind(path string, rawLine string, bindLineNumber int) (*Bind, error) {
-	if len(rawLine) == 0 {
-		return nil, nil
+func parseLine(file *File, line string, lineNumber int) (Line, error) {
+	err := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", lineNumber, line)
+
+	if len(line) == 0 {
+		return &RawLine{}, nil
 	}
 
-	rawLine = strings.TrimSpace(rawLine)
-
-	errorMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", bindLineNumber, rawLine)
-	commented := strings.HasPrefix(rawLine, "#")
-	rawLine = strings.TrimPrefix(rawLine, "#")
-
-	bindDefinition, bindContent, found := strings.Cut(rawLine, "=")
-
-	if !commented && !(strings.Contains(bindDefinition, "bind")) {
-		return nil, errorMsg
-	}
-
-	if !found && !commented {
-		return nil, errorMsg
-	}
-
-	if !found && commented {
-		return nil, nil
-	}
-
-	bindContent = strings.TrimSpace(bindContent)
-	bindDefinition = strings.TrimSpace(bindDefinition)
-	bindFlags := []*Flag{}
-	bindDefinitionLen := len(bindDefinition)
-	bind := Bind{
-		BindCore: BindCore{
-			Flags: []*Flag{},
-			Type:  Normal,
-		},
-		LineNumber: bindLineNumber,
-		RawLine:    rawLine,
-		FilePath:   path,
-		Commented:  commented,
-	}
-
-	if strings.HasPrefix(bindDefinition, "un") {
-		bindCore, err := parseUnbind(bindContent)
+	if strings.HasPrefix(line, "#") {
+		parsedLine, err := parseComment(file, line, lineNumber)
 		if err != nil {
-			return nil, errorMsg
+			return nil, err
 		}
 
-		bind.BindCore = *bindCore
-		bind.Type = Unbind
-
-		return &bind, nil
+		return parsedLine, nil
 	}
 
-	if bindDefinitionLen != 4 {
-		bindFlagsStrings := strings.Split(bindDefinition[4:], "")
-		if slices.Contains(bindFlagsStrings, "s") {
-			// return nil, fmt.Errorf("for now binds with the 's' flag are not supported! Line: %d, Raw line: %s", bindLineNumber, rawLine)
-			return nil, nil
-		}
-
-		for _, bindFlag := range bindFlagsStrings {
-			if flag, ok := DefaultFlags[bindFlag]; ok {
-				bindFlags = append(bindFlags, flag)
-			}
-		}
+	if strings.HasPrefix(line, "unbind") {
+		// never return nil, nil inside parseBind
+		return parseUnbind(file, line, lineNumber)
 	}
 
-	bindCore, err := parseBindContent(bindContent)
+	if strings.HasPrefix(line, "bind") {
+		bind, err := parseBind(file, line, lineNumber)
+		if errors.IsUnsupportedBindFlagError(err) {
+			return &RawLine{
+				Content:    &line,
+				LineNumber: lineNumber,
+			}, nil
+		}
+
+		return bind, err
+	}
+
+	return nil, err
+
+}
+
+func parseComment(file *File, line string, lineNumber int) (Line, error) {
+	err := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", lineNumber, line)
+	trimmedLine := strings.TrimSpace(strings.TrimPrefix(line, "#"))
+
+	if strings.HasPrefix(trimmedLine, "unbind") {
+		unbind, err := parseUnbind(file, line, lineNumber)
+		if err != nil {
+			return &RawLine{
+				Content:    &line,
+				LineNumber: lineNumber,
+			}, nil
+		}
+
+		unbind.Commented = true
+		return unbind, nil
+	}
+
+	if strings.HasPrefix(trimmedLine, "bind") {
+		bind, err := parseBind(file, line, lineNumber)
+		if err != nil {
+			return &RawLine{
+				Content:    &line,
+				LineNumber: lineNumber,
+			}, nil
+		}
+
+		bind.Commented = true
+		return bind, nil
+	}
+
+	return nil, err
+}
+
+func parseBind(file *File, line string, lineNumber int) (*Bind, error) {
+	errMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", lineNumber, line)
+	bindDefinition, bindContent, found := strings.Cut(line, "=")
+
+	if !found {
+		return nil, errMsg
+	}
+
+	var hasDescription bool
+	var flags []*Flag
+
+	bindDefinition, bindContent = strings.TrimSpace(bindDefinition), strings.TrimSpace(bindContent)
+	bindDefinition = strings.TrimSpace(strings.TrimPrefix(bindDefinition, "bind"))
+
+	if len(bindDefinition) != 0 {
+		resultFlags, description, err := parseFlags(bindDefinition, line, lineNumber)
+		if err != nil {
+			return nil, err
+		}
+
+		flags = resultFlags
+		hasDescription = description
+	}
+
+	bindCore, err := parseContent(bindContent, hasDescription, flags)
 	if err != nil {
-		return nil, errorMsg
+		return nil, err
 	}
 
-	bind.BindCore = *bindCore
-	bind.Flags = bindFlags
+	bind, err := NewBind(*bindCore, lineNumber, line, file, false)
+	if err != nil {
+		return nil, err
+	}
 
-	return &bind, nil
+	return bind, nil
 }
 
-func parseUnbind(unbind string) (*BindCore, error) {
-	parts := strings.Split(unbind, ",")
+func parseUnbind(file *File, line string, lineNumber int) (*Unbind, error) {
+	errMsg := fmt.Errorf("invalid bind format on line %d! raw line: (%s)", lineNumber, line)
+	bindDefinition, bindContent, found := strings.Cut(line, "=")
+
+	if !found {
+		return nil, errMsg
+	}
+
+	bindDefinition, bindContent = strings.TrimSpace(bindDefinition), strings.TrimSpace(bindContent)
+	bindDefinition = strings.TrimSpace(strings.TrimPrefix(bindDefinition, "unbind"))
+
+	if len(bindDefinition) != 0 {
+		return nil, errMsg
+	}
+
+	rawShortcut := strings.Split(bindDefinition, ",")
+	if len(rawShortcut) != 2 {
+		return nil, errMsg
+	}
+
+	for idx, part := range rawShortcut {
+		rawShortcut[idx] = strings.TrimSpace(part)
+	}
+
+	unbind, err := NewUnbind(parseShortcut(rawShortcut), lineNumber, line, file, false)
+	if err != nil {
+		return nil, err
+	}
+	return unbind, nil
+}
+
+func parseShortcut(shortcut []string) Shortcut {
+	var modKeys []string
+
+	if len(shortcut[0]) != 0 {
+		modKeys = parseModKeys(shortcut[0])
+	}
+
+	return Shortcut{
+		ModKeys: modKeys,
+		Key:     shortcut[1],
+	}
+}
+
+func parseFlags(rawFlags, rawLine string, lineNumber int) ([]*Flag, bool, error) {
+	if strings.Contains(rawFlags, "s") {
+		return nil, false, errors.NewUnsupportedBindFlagError(lineNumber, rawLine, "s")
+	}
+
+	if len(rawFlags) > 14 {
+		return nil, false, fmt.Errorf("invalid bind flags! line: %d", lineNumber)
+	}
+
+	separatedFlags := strings.Split(rawFlags, "")
+	parsedFlags := map[string]*Flag{}
+	resultFlags := make([]*Flag, 14)
+
+	for idx, rawFlag := range separatedFlags {
+		flag, ok := DefaultFlags[rawFlag]
+		if !ok {
+			return nil, false, fmt.Errorf("invalid flag! line: %d", lineNumber)
+		}
+
+		_, ok = parsedFlags[rawFlag]
+		if ok {
+			return nil, false, fmt.Errorf("invalid bind flags, flag \"%s\" repeated! line: %d", rawFlag, lineNumber)
+		}
+
+		parsedFlags[rawFlag] = flag
+		resultFlags[idx] = flag
+	}
+
+	_, ok := parsedFlags["d"]
+	return resultFlags, ok, nil
+}
+
+func parseContent(content string, hasDescription bool, flags []*Flag) (*BindCore, error) {
+	parts := strings.Split(content, ",")
 	partsLen := len(parts)
 
-	if partsLen != 2 {
+	if (hasDescription && partsLen != 5) || (partsLen != 4) {
 		return nil, fmt.Errorf("invalid bind format")
 	}
 
@@ -126,65 +234,31 @@ func parseUnbind(unbind string) (*BindCore, error) {
 		parts[i] = strings.TrimSpace(p)
 	}
 
-	modKeys := parseModKeys(parts[0])
-	key := parts[1]
+	shortcut := parseShortcut(parts[0:2])
 
-	return &BindCore{
-		Shortcut: Shortcut{
-			ModKeys: modKeys,
-			Key:     key,
-		},
-		Dispatcher:  "",
-		Action:      "",
-		Description: "",
-	}, nil
-}
-
-func parseBindContent(bindContent string) (*BindCore, error) {
-	parts := strings.Split(bindContent, ",")
-	partsLen := len(parts)
-
-	if partsLen > 5 || partsLen < 4 {
-		return nil, fmt.Errorf("invalid bind format")
-	}
-
-	for i, p := range parts {
-		parts[i] = strings.TrimSpace(p)
-	}
-
-	modKeys := parseModKeys(parts[0])
-	key := parts[1]
 	action := parts[3]
 	dispatcher := parts[2]
 	var description string
 
-	if partsLen == 5 {
+	if hasDescription {
 		dispatcher = parts[3]
 		action = parts[4]
 		description = parts[2]
 	}
 
 	return &BindCore{
-		Shortcut: Shortcut{
-			ModKeys: modKeys,
-			Key:     key,
-		},
+		Shortcut:    shortcut,
 		Dispatcher:  dispatcher,
 		Action:      action,
 		Description: description,
-		Type:        Normal,
+		Flags:       flags,
 	}, nil
 }
 
 func parseModKeys(modKeys string) []string {
-	if modKeys == "" {
-		return nil
-	}
-
 	s := strings.ToUpper(modKeys)
-	separatedModKeys := []string{}
+	var separatedModKeys []string
 
-	// it needs to be like that because hyprland doesnt define an especific separator
 	for _, modKey := range ModKeys {
 		if strings.Contains(s, modKey) {
 			separatedModKeys = append(separatedModKeys, modKey)

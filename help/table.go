@@ -48,3 +48,32 @@ var TableKeys = TableKeyMap{
 		key.WithHelp("esc", "go to previous page"),
 	),
 }
+
+type ReadonlyTableKeyMap struct {
+	CommonKeyMap
+	Unbind, Details, GoBack key.Binding
+}
+
+func (k ReadonlyTableKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Unbind, k.Close, k.GoBack}
+}
+
+func (k ReadonlyTableKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{k.Up, k.Down, k.Unbind}, {k.Details, k.Close, k.GoBack}}
+}
+
+var ReadonlyTableKeys = ReadonlyTableKeyMap{
+	CommonKeyMap: CommonKeys,
+	Unbind: key.NewBinding(
+		key.WithKeys("u"),
+		key.WithHelp("u", "unbind"),
+	),
+	Details: key.NewBinding(
+		key.WithKeys("D"),
+		key.WithHelp("D", "bind details"),
+	),
+	GoBack: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "go to previous page"),
+	),
+}

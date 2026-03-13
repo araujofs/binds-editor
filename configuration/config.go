@@ -8,33 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/araujofs/binds-editor/binds"
 )
 
-type File struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-}
-
-func (f File) FilterValue() string {
-	return f.Name
-}
-
-func (f File) Description() string {
-	return f.Path
-}
-
-func (f File) Title() string {
-	return f.Name
-}
-
 type Configuration struct {
-	Files []*File `json:"files"`
+	Files []*binds.File `json:"files"`
 }
 
 // SearchSlice tries to find a *File inside a []*File slice
 // based on the fieldName and fieldValue.
 // Returns the index if it exists or -1 if it doesn't.
-func SearchSlice(s []*File, fieldName string, fieldValue string) int {
+func SearchSlice(s []*binds.File, fieldName string, fieldValue string) int {
 	for idx, file := range s {
 		if (fieldName == "Name" && file.Name == fieldValue) || (fieldName == "Path" && file.Path == fieldValue) {
 			return idx
@@ -60,18 +45,18 @@ func (c *Configuration) fileExists(path *string, name *string) (int, int) {
 	return -1, -1
 }
 
-func (c *Configuration) AddFile(path string, name string) error {
-	_, exists := c.fileExists(&path, &name)
+func (c *Configuration) AddFile(newFile *binds.File) error {
+	_, exists := c.fileExists(&newFile.Path, &newFile.Name)
 
 	if exists == 1 {
-		return fmt.Errorf(`bindings file already exists with name "%s"`, name)
+		return fmt.Errorf(`bindings file already exists with name "%s"`, newFile.Name)
 	}
 
 	if exists == 2 {
-		return fmt.Errorf(`bindings file already exists with path "%s"`, path)
+		return fmt.Errorf(`bindings file already exists with path "%s"`, newFile.Path)
 	}
 
-	c.Files = append(c.Files, &File{Name: name, Path: path})
+	c.Files = append(c.Files, newFile)
 
 	return nil
 }
@@ -88,14 +73,14 @@ func (c *Configuration) RemoveFile(name string) error {
 	return nil
 }
 
-func (c *Configuration) EditFile(oldName string, newName string) error {
-	idx, exists := c.fileExists(nil, &oldName)
+func (c *Configuration) EditFile(oldFileName string, newFile binds.File) error {
+	idx, exists := c.fileExists(nil, &oldFileName)
 
 	if exists == -1 {
-		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldName)
+		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldFileName)
 	}
 
-	c.Files[idx].Name = newName
+	c.Files[idx] = &newFile
 
 	return nil
 }
@@ -114,7 +99,7 @@ func GetConfigData() *Configuration {
 		}
 
 		return &Configuration{
-			Files: []*File{},
+			Files: []*binds.File{},
 		}
 	}
 
