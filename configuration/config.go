@@ -9,67 +9,17 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/araujofs/binds-editor/binds"
 )
 
-type File struct {
-	Name     string `json:"name"`
-	Path     string `json:"path"`
-	Readonly bool   `json:"readonly"`
-	Output   string `json:"output"`
-}
-
-func (f File) FilterValue() string {
-	return f.Name
-}
-
-func (f File) Description() string {
-	var description string
-
-	description += f.Path
-
-	if f.Readonly {
-		description += " - " + f.Output
-	}
-
-	return description
-}
-
-func (f File) Title() string {
-	readonly := lipgloss.NewStyle().Foreground(lipgloss.Color("#fb1")).Render(" (Readonly)")
-
-	if f.Readonly {
-		return f.Name + readonly
-	}
-
-	return f.Name
-}
-
 type Configuration struct {
-	Files []*File `json:"files"`
-}
-
-func CreateFile(name, path string, output *string, readonly *bool) *File {
-	file := &File{
-		Name: name,
-		Path: path,
-	}
-
-	if output != nil {
-		file.Output = *output
-	}
-
-	if readonly != nil {
-		file.Readonly = *readonly
-	}
-
-	return file
+	Files []*binds.File `json:"files"`
 }
 
 // SearchSlice tries to find a *File inside a []*File slice
 // based on the fieldName and fieldValue.
 // Returns the index if it exists or -1 if it doesn't.
-func SearchSlice(s []*File, fieldName string, fieldValue string) int {
+func SearchSlice(s []*binds.File, fieldName string, fieldValue string) int {
 	for idx, file := range s {
 		if (fieldName == "Name" && file.Name == fieldValue) || (fieldName == "Path" && file.Path == fieldValue) {
 			return idx
@@ -95,7 +45,7 @@ func (c *Configuration) fileExists(path *string, name *string) (int, int) {
 	return -1, -1
 }
 
-func (c *Configuration) AddFile(newFile *File) error {
+func (c *Configuration) AddFile(newFile *binds.File) error {
 	_, exists := c.fileExists(&newFile.Path, &newFile.Name)
 
 	if exists == 1 {
@@ -123,19 +73,14 @@ func (c *Configuration) RemoveFile(name string) error {
 	return nil
 }
 
-func (c *Configuration) EditFile(oldFileName string, newFile File) error {
+func (c *Configuration) EditFile(oldFileName string, newFile binds.File) error {
 	idx, exists := c.fileExists(nil, &oldFileName)
 
 	if exists == -1 {
 		return fmt.Errorf(`bindings file with name "%s" doesn't exist`, oldFileName)
 	}
 
-	file := c.Files[idx]
-
-	file.Name = newFile.Name
-	file.Path = newFile.Path
-	file.Readonly = newFile.Readonly
-	file.Output = newFile.Output
+	c.Files[idx] = &newFile
 
 	return nil
 }
@@ -154,7 +99,7 @@ func GetConfigData() *Configuration {
 		}
 
 		return &Configuration{
-			Files: []*File{},
+			Files: []*binds.File{},
 		}
 	}
 
